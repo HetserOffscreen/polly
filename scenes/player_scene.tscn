@@ -1,0 +1,50 @@
+[gd_scene format=3 uid="uid://1jb22rygluat"]
+
+[ext_resource type="Script" uid="uid://c7kta8q6js88b" path="res://scripts/player.gd" id="1_crmta"]
+
+[sub_resource type="CanvasTexture" id="CanvasTexture_crmta"]
+
+[sub_resource type="Gradient" id="Gradient_crmta"]
+offsets = PackedFloat32Array(0, 0.45697328)
+colors = PackedColorArray(1, 1, 1, 1, 0, 0, 0, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_vefth"]
+gradient = SubResource("Gradient_crmta")
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+
+[node name="Player" type="CharacterBody2D" unique_id=1260122610]
+collision_mask = 2
+script = ExtResource("1_crmta")
+
+[node name="Body" type="Polygon2D" parent="." unique_id=1974006901]
+unique_name_in_owner = true
+texture = SubResource("CanvasTexture_crmta")
+polygon = PackedVector2Array(0, -30, -25, 25, 25, 25)
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="." unique_id=312490499]
+unique_name_in_owner = true
+visible = false
+
+[node name="PointLight2D" type="PointLight2D" parent="." unique_id=1607022104]
+z_index = -1
+position = Vector2(0, -2.9999847)
+scale = Vector2(3.25, 3.2500005)
+energy = 1.5
+shadow_enabled = true
+texture = SubResource("GradientTexture2D_vefth")
+
+[node name="DustParticles" type="CPUParticles2D" parent="." unique_id=990898148]
+unique_name_in_owner = true
+position = Vector2(0, 19)
+emitting = false
+lifetime = 0.4
+one_shot = true
+explosiveness = 0.85
+direction = Vector2(0, -1)
+spread = 50.0
+gravity = Vector2(0, 220)
+initial_velocity_min = 25.0
+initial_velocity_max = 55.0
+scale_amount_max = 5.0
+color = Color(0.8509804, 0.8509804, 0.8, 1)

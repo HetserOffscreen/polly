@@ -1,0 +1,154 @@
+[gd_scene format=3 uid="uid://piijqd14i7tq"]
+
+[ext_resource type="Script" uid="uid://cslsw6uc02okp" path="res://scripts/killzone.gd" id="1_t18mc"]
+[ext_resource type="PackedScene" uid="uid://1jb22rygluat" path="res://scenes/player_scene.tscn" id="2_843q2"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_jrljy"]
+size = Vector2(308, 110)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_5klxn"]
+size = Vector2(2925, 105)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_t18mc"]
+size = Vector2(1179, 56.00003)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_glv2v"]
+size = Vector2(984, 55.000004)
+
+[sub_resource type="Animation" id="Animation_t18mc"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(472, 345)]
+}
+
+[sub_resource type="Animation" id="Animation_843q2"]
+resource_name = "move"
+length = 4.0
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 2, 4),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(-100, 345), Vector2(600, 345), Vector2(-100, 345)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_5rfim"]
+_data = {
+&"RESET": SubResource("Animation_t18mc"),
+&"move": SubResource("Animation_843q2")
+}
+
+[node name="Level One" type="Node2D" unique_id=836972346]
+
+[node name="Scenario" type="Node2D" parent="." unique_id=553546201]
+
+[node name="WhiteSubtraction" type="DirectionalLight2D" parent="Scenario" unique_id=992816106]
+visible = false
+blend_mode = 1
+
+[node name="Killzone" type="Area2D" parent="Scenario" unique_id=488430628]
+position = Vector2(119, 650)
+collision_layer = 2
+script = ExtResource("1_t18mc")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Scenario/Killzone" unique_id=728989687]
+position = Vector2(1, 16)
+shape = SubResource("RectangleShape2D_jrljy")
+debug_color = Color(0.9799214, 0, 0.3879387, 0.41960785)
+
+[node name="Floor" type="StaticBody2D" parent="Scenario" unique_id=483137816]
+position = Vector2(588, 567)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Scenario/Floor" unique_id=1570704685]
+position = Vector2(1050.5, 42.5)
+shape = SubResource("RectangleShape2D_5klxn")
+debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
+
+[node name="Walls" type="StaticBody2D" parent="Scenario" unique_id=598328007]
+position = Vector2(3, 532)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Scenario/Walls" unique_id=1158238609]
+position = Vector2(-7.0000057, -400.5)
+rotation = 1.5707964
+shape = SubResource("RectangleShape2D_t18mc")
+debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
+
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="Scenario/Walls" unique_id=778935523]
+position = Vector2(1133.5, -509)
+rotation = 1.5707964
+shape = SubResource("RectangleShape2D_glv2v")
+debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Scenario/Walls" unique_id=872183268]
+position = Vector2(0, 18)
+polygon = PackedVector2Array(1243, -341, 1536, -341, 1533, -34, 1410.0308, -34, 1391, -75, 1374, -34, 1245, -34)
+
+[node name="Platform" type="StaticBody2D" parent="Scenario" unique_id=598443332]
+position = Vector2(867, 433)
+collision_layer = 2
+
+[node name="Node2D" type="CollisionPolygon2D" parent="Scenario/Platform" unique_id=1141220467]
+position = Vector2(-430, -408)
+polygon = PackedVector2Array(645, 260, 434, 405, 260, 410, 296, 446, 529, 446, 532, 408)
+
+[node name="Platform2" type="StaticBody2D" parent="Scenario" unique_id=502809239]
+position = Vector2(754, 194)
+collision_layer = 2
+
+[node name="Node2D" type="CollisionPolygon2D" parent="Scenario/Platform2" unique_id=818675178]
+position = Vector2(-451, -435)
+polygon = PackedVector2Array(434, 405, 260, 410, 296, 446, 456.4743, 446, 529, 446, 532, 408)
+
+[node name="Platform3" type="StaticBody2D" parent="Scenario" unique_id=273327101]
+position = Vector2(320, 94)
+collision_layer = 2
+
+[node name="Node2D" type="CollisionPolygon2D" parent="Scenario/Platform3" unique_id=1354766509]
+position = Vector2(-451, -435)
+polygon = PackedVector2Array(434, 405, 397, 404, 220, 443, 408, 505, 532, 408)
+
+[node name="MovingPlatform" type="AnimatableBody2D" parent="Scenario" unique_id=2074026049]
+position = Vector2(472, 345)
+collision_layer = 2
+
+[node name="Node2D" type="CollisionPolygon2D" parent="Scenario/MovingPlatform" unique_id=976224016]
+position = Vector2(-289.23984, -293.25552)
+scale = Vector2(0.72879857, 0.7161467)
+polygon = PackedVector2Array(261, 387, 537, 382, 536, 424, 254, 430)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Scenario/MovingPlatform" unique_id=403584597]
+libraries/ = SubResource("AnimationLibrary_5rfim")
+autoplay = &"move"
+
+[node name="Player" parent="." unique_id=1260122610 instance=ExtResource("2_843q2")]
+position = Vector2(499, 530)
+
+[node name="Camera2D" type="Camera2D" parent="Player" unique_id=1374289153]
+unique_name_in_owner = true
+zoom = Vector2(1.2, 1.2)
+
+[node name="RigidBody2D" type="RigidBody2D" parent="." unique_id=145978954]
+position = Vector2(988, 59)
+
+[node name="Node2D" type="CollisionPolygon2D" parent="RigidBody2D" unique_id=1290615266]
+position = Vector2(-394, -464)
+polygon = PackedVector2Array(400, 436, 346, 434, 345, 491, 433.61154, 487.0085, 456, 486, 441, 423)
+
+[connection signal="body_entered" from="Scenario/Killzone" to="Scenario/Killzone" method="_on_body_entered"]
