@@ -6,78 +6,80 @@ extends CharacterBody2D
 @onready var camera: 			Camera2D           	= %Camera2D
 
 # --- Horizontal movement ---
-const MAX_FLOOR_SPEED: 			float				= 500.0		# top running speed
-const FLOOR_ACCELERATION:		float				= 1300.0	# how fast we reach top speed on the ground
-const FLOOR_FRICTION:			float				= 1600.0 	# how fast we stop on the ground
-const AIR_ACCELERATION:			float				= 900.0		# weaker steering in the air...
-const AIR_FRICTION:				float				= 350.0   	# longer momentum
+@export_group("Horizontal Movement")
+@export var FLOOR_MAX_SPEED: 		float		= 500.0
+@export var FLOOR_ACCELERATION:		float		= 1300.0
+@export var FLOOR_FRICTION:			float		= 1800.0
+@export var AIR_ACCELERATION:		float		= 900.0		# weaker steering in the air...
+@export var AIR_FRICTION:			float		= 350.0   	# longer momentum
 
 # --- Jumping ---
-const JUMP_VELOCITY: 			float				= -450.0	# jump max height
-const DOUBLE_JUMP_VELOCITY: 	float				= -300.0  	# the second (air) jump, a touch weaker
-const JUMP_CUT: 				float				= 0.45		# variable height
-const STOMP_BOUNCE: 			float				= -260.0  	# upward kick when you stomp an enemy 
-const MAX_FALL_SPEED: 			float				= 900.0   	# terminal velocity so falls stay controllable
-const MAX_AIR_JUMPS: 			int  				= 2       	
-
-# --- Forgiveness windows (seconds) ---
-const COYOTE_TIME: 				float				= 0.10		
-const JUMP_BUFFER: 				float				= 0.10		
-const CORNER_CORRECTION_PIXELS: int	 				= 4			# value in Pixels
+@export_group("Jumping")
+@export var JUMP_VELOCITY: 			float		= -450.0	# jump max height
+@export var DOUBLE_JUMP_VELOCITY: 	float		= -300.0  	# the second (air) jump, a touch weaker
+@export var JUMP_CUT: 				float		= 0.45		
+@export var STOMP_BOUNCE: 			float		= -260.0  	# upward kick when you stomp an enemy 
+@export var MAX_FALL_SPEED: 		float		= 900.0   	# terminal velocity so falls stay controllable
+@export var MAX_AIR_JUMPS: 			int  		= 2       	
 
 # --- Gravity feel ---
-const RISE_GRAVITY_MULT: 		float				= 0.9		# a little floaty on the way up
-const FALL_GRAVITY_MULT:		float				= 3.0		# snappier on the way down
-const APEX_SPEED_THRESHOLD:		float				= 45.0		# |vertical speed| under this = "near the apex"
-const APEX_GRAVITY_MULT: 		float				= 0.55		# extra-light gravity inside the hang window
-const BASE_GRAVITY:				float				= 980.0		# px/s²
+@export_group("Gravity feel")
+const RISE_GRAVITY_MULT: 		float			= 0.9		# a little floaty on the way up
+const FALL_GRAVITY_MULT:		float			= 3.0		# snappier on the way down
+const APEX_SPEED_THRESHOLD:		float			= 45.0		# |vertical speed| under this = "near the apex"
+const APEX_GRAVITY_MULT: 		float			= 0.55		# extra-light gravity inside the hang window
+const BASE_GRAVITY:				float			= 980.0		# value in px/s²
 
-# --- Squash & stretch (Mario-style spring) ---
-const SQUASH_STIFFNESS:			float				= 360.0  # spring strength — higher = snappier recovery
-const SQUASH_DAMPING:			float				= 16.0   # higher = calmer; lower = more bounce/wobble
-const AIR_STRETCH_MAX:			float				= 0.10   # subtle tall-stretch that grows with air speed
-const SQUASH_PIVOT:				float				= 16.0   # keeps the feet planted while squashing
-const LAND_SQUASH_MIN:			float				= 0.14   # squash from the softest landing
-const LAND_SQUASH_MAX:			float				= 0.36   # squash from a full-speed slam
-const JUMP_STRETCH:				float				= 0.22   # stretch on take-off
-const BOUNCE_SQUASH:			float				= 0.28   
-const SPAWN_SQUASH:				float				= 0.22   # the pop-in at level start
 
-# --- Runtime state ---
-var air_jumps_left:				int					= 0
-var coyote_timer:				float				= 0.0
-var jump_buffer_timer:			float				= 0.0
-var dust_cooldown:				float				= 0.0
-var was_on_floor:				bool				= false
-var is_dead:					bool				= false
+# --- Forgiveness windows (seconds) ---
+const COYOTE_TIME: 				float			= 0.10		
+const JUMP_BUFFER: 				float			= 0.10		
+const CORNER_CORRECTION_PIXELS: int	 			= 4			# value in Pixels
 
-# Squash & stretch spring state 
-var squash:						float				= 0.0		# squash > 0 = squashed
-var squash_vel:					float				= 0.0		# (wide & short), squash < 0 = stretched (tall & thin); it springs back to 0.
-var base_sprite_y:				float				= 0.0
-
-# --- Camera feel: shake, look-ahead, zoom punch ---
-var shake_strength:				float				= 0.0
-const SHAKE_DECAY:				float				= 28.0   	# higher = shake settles back faster
+# --- Camera feel ---
+var shake_strength:				float			= 0.0
+const SHAKE_DECAY:				float			= 28.0   	# higher = shake settles back faster
 
 # look ahead
-var look_ahead_x:				float				= 0.0
-const LOOK_AHEAD:				float				= 16.0  	# how far the camera leads, in pixels
-const LOOK_AHEAD_SPEED:			float				= 4.0   	# how quickly it eases to the lead position
+var look_ahead_x:				float			= 0.0
+const LOOK_AHEAD:				float			= 16.0  	# how far the camera leads, in pixels
+const LOOK_AHEAD_SPEED:			float			= 4.0   	# how quickly it eases to the lead position
 
 # Zoom "punch": a quick push-in on big impacts that springs back to normal.
-var base_zoom:					Vector2				= Vector2.ONE
-var zoom_punch:					float				= 0.0
-const ZOOM_PUNCH_DECAY:			float				= 5.0
+var base_zoom:					Vector2			= Vector2.ONE
+var zoom_punch:					float			= 0.0
+const ZOOM_PUNCH_DECAY:			float			= 5.0
 
-# --- Motion trail (after-images) ---
-var trail_timer:				float				= 0.0
-var afterimage_cooldown:		float				= 0.0
-const TRAIL_DURATION:			float			    = 0.35
-const AFTERIMAGE_INTERVAL:		float			 	= 0.05
-const TRAIL_COLOR: 				Color				= Color(0.6, 0.8, 1.0, 0.5)
+# --- Animation
+# --- Motion trail  ---
+var trail_timer:				float			= 0.0
+var afterimage_cooldown:		float			= 0.0
+const TRAIL_DURATION:			float		    = 0.35
+const AFTERIMAGE_INTERVAL:		float		 	= 0.05
+const TRAIL_COLOR: 				Color			= Color(0.6, 0.8, 1.0, 0.5)
 
+# --- Squash & stretch  ---
+const SQUASH_STIFFNESS:			float			= 360.0  # spring strength — higher = snappier recovery
+const SQUASH_DAMPING:			float			= 16.0   # higher = calmer; lower = more bounce/wobble
+const AIR_STRETCH_MAX:			float			= 0.10   # subtle tall-stretch that grows with air speed
+const SQUASH_PIVOT:				float			= 16.0   # keeps the feet planted while squashing
+const LAND_SQUASH_MIN:			float			= 0.14   # squash from the softest landing
+const LAND_SQUASH_MAX:			float			= 0.36   # squash from a full-speed slam
+const JUMP_STRETCH:				float			= 0.22   # stretch on take-off
+const BOUNCE_SQUASH:			float			= 0.28    
 
+# Squash & stretch spring state 
+var squash:						float			= 0.0		# squash > 0 = squashed
+var squash_vel:					float			= 0.0		# (wide & short), squash < 0 = stretched (tall & thin); it springs back to 0.
+var base_sprite_y:				float			= 0.0
+
+# --- Runtime state ---
+var air_jumps_left:				int				= 0
+var coyote_timer:				float			= 0.0
+var jump_buffer_timer:			float			= 0.0
+var dust_cooldown:				float			= 0.0
+var was_on_floor:				bool			= false
+var is_dead:					bool			= false
 
 
 func _ready() -> void:
@@ -90,7 +92,7 @@ func _ready() -> void:
 	if camera:
 		base_zoom = camera.zoom   # remember the resting zoom so punches settle back
 	base_sprite_y = player_body.position.y
-	_squash_impulse(SPAWN_SQUASH)
+	_squash_impulse(BOUNCE_SQUASH) # the pop-in at level start
 
 
 func _physics_process(delta: float) -> void:
@@ -188,7 +190,7 @@ func _handle_horizontal_movement(delta: float) -> void:
 	var direction := Input.get_axis("move_left", "move_right")
 	if direction != 0.0:
 		var accel := FLOOR_ACCELERATION if is_on_floor() else AIR_ACCELERATION
-		velocity.x = move_toward(velocity.x, direction * MAX_FLOOR_SPEED, accel * delta)
+		velocity.x = move_toward(velocity.x, direction * FLOOR_MAX_SPEED, accel * delta)
 	else:
 		var fric := FLOOR_FRICTION if is_on_floor() else AIR_FRICTION
 		velocity.x = move_toward(velocity.x, 0.0, fric * delta)
@@ -199,6 +201,27 @@ func _handle_horizontal_movement(delta: float) -> void:
 		if dust_cooldown <= 0.0:
 			dust_cooldown = 0.2
 			_spawn_dust(3)
+
+func die():
+	if is_dead:
+		return
+	is_dead = true
+
+	#_play_varied(hurt_sound)
+	Visuals.spawn_burst(global_position + Vector2(0, -6), Color(1.0, 0.4, 0.4), 22, 150.0)
+	Visuals.flash_screen(Color(0.7, 0.05, 0.05, 0.55), 0.5)   # red full-screen hit-flash
+	#Music.duck()                                            # drop + muffle the music
+	add_shake(7.0)
+	add_zoom_punch(0.18)
+	velocity = Vector2.ZERO
+	set_physics_process(false)
+	player_collision.set_deferred("disabled", true)
+
+	# Dramatic slow-mo, then restart.
+	Engine.time_scale = 0.4
+	await get_tree().create_timer(0.8, true, false, true).timeout
+	Engine.time_scale = 1.0
+	get_tree().reload_current_scene()
 
 # ---------------------------------------------------------------------------
 #  LANDING & STOMPING
@@ -228,10 +251,10 @@ func bounce(amount: float = STOMP_BOUNCE):
 	add_zoom_punch(0.10)         # snappy push-in sells the stomp
 	trail_timer = TRAIL_DURATION # streak off the bounce
 	_squash_impulse(BOUNCE_SQUASH)
-	Visuals.hit_stop(0.07)      
+	Visuals.hit_stop(0.07)   
 
 # ---------------------------------------------------------------------------
-#  FEEDBACK HELPERS
+#  HELPERS
 # ---------------------------------------------------------------------------
 
 # camera stuff
@@ -242,9 +265,6 @@ func add_shake(amount: float):
 func add_zoom_punch(amount: float):
 	zoom_punch = max(zoom_punch, amount)
 
-
-
-
 # While the trail timer is active, drop a fading ghost on a fixed cadence.
 func _update_trail(delta: float):
 	if trail_timer <= 0.0:
@@ -254,7 +274,6 @@ func _update_trail(delta: float):
 	if afterimage_cooldown <= 0.0:
 		afterimage_cooldown = AFTERIMAGE_INTERVAL
 		_spawn_afterimage()
-
 
 # Snapshots the current sprite frame as a static ghost that fades out in place.
 func _spawn_afterimage():
@@ -276,7 +295,6 @@ func _spawn_afterimage():
 	var tween := ghost.create_tween()
 	tween.tween_property(ghost, "modulate:a", 0.0, 0.25)
 	tween.tween_callback(ghost.queue_free)
-
 
 # Plays a sound with a little random pitch so repeated actions never sound
 # identical — the cheapest way to kill "repetition fatigue" in the SFX.
@@ -324,24 +342,3 @@ func _update_squash(delta: float):
 	squash += squash_vel * d
 	player_body.scale = Vector2(1.0 + squash, 1.0 - squash)
 	player_body.position.y = base_sprite_y + SQUASH_PIVOT * squash
-
-func die():
-	if is_dead:
-		return
-	is_dead = true
-
-	#_play_varied(hurt_sound)
-	Visuals.spawn_burst(global_position + Vector2(0, -6), Color(1.0, 0.4, 0.4), 22, 150.0)
-	Visuals.flash_screen(Color(0.7, 0.05, 0.05, 0.55), 0.5)   # red full-screen hit-flash
-	#Music.duck()                                            # drop + muffle the music
-	add_shake(7.0)
-	add_zoom_punch(0.18)
-	velocity = Vector2.ZERO
-	set_physics_process(false)
-	player_collision.set_deferred("disabled", true)
-
-	# Dramatic slow-mo, then restart.
-	Engine.time_scale = 0.4
-	await get_tree().create_timer(0.8, true, false, true).timeout
-	Engine.time_scale = 1.0
-	get_tree().reload_current_scene()
