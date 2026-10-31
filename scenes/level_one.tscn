@@ -13,7 +13,7 @@ size = Vector2(2925, 105)
 size = Vector2(1179, 56.00003)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_glv2v"]
-size = Vector2(984, 55.000004)
+size = Vector2(365, 61)
 
 [sub_resource type="Animation" id="Animation_t18mc"]
 length = 0.001
@@ -91,38 +91,16 @@ shape = SubResource("RectangleShape2D_t18mc")
 debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
 
 [node name="CollisionShape2D2" type="CollisionShape2D" parent="Scenario/Walls" unique_id=778935523]
-position = Vector2(1133.5, -509)
+position = Vector2(862, -400)
 rotation = 1.5707964
 shape = SubResource("RectangleShape2D_glv2v")
 debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
 
-[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Scenario/Walls" unique_id=872183268]
-position = Vector2(0, 18)
-polygon = PackedVector2Array(1243, -341, 1536, -341, 1533, -34, 1410.0308, -34, 1391, -75, 1374, -34, 1245, -34)
-
-[node name="Platform" type="StaticBody2D" parent="Scenario" unique_id=598443332]
-position = Vector2(867, 433)
-collision_layer = 2
-
-[node name="Node2D" type="CollisionPolygon2D" parent="Scenario/Platform" unique_id=1141220467]
-position = Vector2(-430, -408)
-polygon = PackedVector2Array(645, 260, 434, 405, 260, 410, 296, 446, 529, 446, 532, 408)
-
-[node name="Platform2" type="StaticBody2D" parent="Scenario" unique_id=502809239]
-position = Vector2(754, 194)
-collision_layer = 2
-
-[node name="Node2D" type="CollisionPolygon2D" parent="Scenario/Platform2" unique_id=818675178]
-position = Vector2(-451, -435)
-polygon = PackedVector2Array(434, 405, 260, 410, 296, 446, 456.4743, 446, 529, 446, 532, 408)
-
-[node name="Platform3" type="StaticBody2D" parent="Scenario" unique_id=273327101]
-position = Vector2(320, 94)
-collision_layer = 2
-
-[node name="Node2D" type="CollisionPolygon2D" parent="Scenario/Platform3" unique_id=1354766509]
-position = Vector2(-451, -435)
-polygon = PackedVector2Array(434, 405, 397, 404, 220, 443, 408, 505, 532, 408)
+[node name="CollisionShape2D3" type="CollisionShape2D" parent="Scenario/Walls" unique_id=1069837383]
+position = Vector2(584, -254)
+rotation = 1.5707964
+shape = SubResource("RectangleShape2D_glv2v")
+debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
 
 [node name="MovingPlatform" type="AnimatableBody2D" parent="Scenario" unique_id=2074026049]
 position = Vector2(472, 345)
@@ -143,12 +121,5 @@ position = Vector2(499, 530)
 [node name="Camera2D" type="Camera2D" parent="Player" unique_id=1374289153]
 unique_name_in_owner = true
 zoom = Vector2(1.2, 1.2)
-
-[node name="RigidBody2D" type="RigidBody2D" parent="." unique_id=145978954]
-position = Vector2(988, 59)
-
-[node name="Node2D" type="CollisionPolygon2D" parent="RigidBody2D" unique_id=1290615266]
-position = Vector2(-394, -464)
-polygon = PackedVector2Array(400, 436, 346, 434, 345, 491, 433.61154, 487.0085, 456, 486, 441, 423)
 
 [connection signal="body_entered" from="Scenario/Killzone" to="Scenario/Killzone" method="_on_body_entered"]

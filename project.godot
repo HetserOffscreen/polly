@@ -16,7 +16,7 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 
 [autoload]
 
-Juice="*res://scripts/juice.gd"
+Visuals="*res://scripts/visuals.gd"
 
 [display]
 

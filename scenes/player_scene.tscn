@@ -20,9 +20,9 @@ script = ExtResource("1_crmta")
 [node name="Body" type="Polygon2D" parent="." unique_id=1974006901]
 unique_name_in_owner = true
 texture = SubResource("CanvasTexture_crmta")
-polygon = PackedVector2Array(0, -30, -25, 25, 25, 25)
+polygon = PackedVector2Array(-20, -20, 20, -20, 20, 20, -20, 20)
 
-[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="." unique_id=312490499]
+[node name="CollisionShape" type="CollisionPolygon2D" parent="." unique_id=312490499]
 unique_name_in_owner = true
 visible = false
 

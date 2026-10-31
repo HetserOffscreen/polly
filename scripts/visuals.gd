@@ -1,29 +1,19 @@
-# Juice.gd  --  Global "game feel" helpers (registered as an Autoload singleton).
-#
-# This little singleton is the home for effects that any object in the game might
-# want to trigger: a freeze-frame on impact ("hit-stop") and quick particle
-# bursts. Keeping them here means coins, slimes and the player can all reach for
-# the same polish with a single line, e.g.  Juice.spawn_burst(pos, Color.YELLOW)
 extends Node
+# ---------------------------------------------------------------------------
+# PLAYER
+# ---------------------------------------------------------------------------
+
+
 
 
 # ---------------------------------------------------------------------------
-# HIT-STOP  (a.k.a. freeze frames / impact pause)
+# JUICE HELPERS
 # ---------------------------------------------------------------------------
-# Briefly freezes the whole game on a big impact, then snaps back to normal.
-# That tiny pause makes hits feel like they actually *connect*. We use a timer
-# with ignore_time_scale = true so the pause lasts a real-world duration even
-# though Engine.time_scale is 0.
 func hit_stop(duration: float = 0.08) -> void:
 	Engine.time_scale = 0.0
 	await get_tree().create_timer(duration, true, false, true).timeout
 	Engine.time_scale = 1.0
 
-
-# ---------------------------------------------------------------------------
-# PARTICLE BURST
-# ---------------------------------------------------------------------------
-# Spawns a one-shot puff of particles at a world position and cleans itself up.
 # Used for coin sparkles, enemy splats, landing dust, death poofs, etc.
 func spawn_burst(global_pos: Vector2, color: Color = Color.WHITE, amount: int = 12, speed: float = 110.0) -> void:
 	var scene := get_tree().current_scene
@@ -55,20 +45,14 @@ func spawn_burst(global_pos: Vector2, color: Color = Color.WHITE, amount: int = 
 	get_tree().create_timer(1.2).timeout.connect(p.queue_free)
 
 
-# ---------------------------------------------------------------------------
-# FULL-SCREEN FLASH
-# ---------------------------------------------------------------------------
-# Flashes a colour across the whole screen, then fades it out. A quick tint is
-# one of the loudest, cheapest ways to say "that mattered" — a red flash on
-# death, a white pop on a big hit. Runs on its own CanvasLayer so it always
-# sits on top of the game and ignores the camera.
+# a red flash on death, a white pop on a big hit...
 func flash_screen(color: Color = Color(1, 1, 1, 0.5), duration: float = 0.3) -> void:
 	var scene := get_tree().current_scene
 	if scene == null:
 		return
 
 	var layer := CanvasLayer.new()
-	layer.layer = 100              # above everything, including the HUD
+	layer.layer = 100
 
 	var rect := ColorRect.new()
 	rect.color = color

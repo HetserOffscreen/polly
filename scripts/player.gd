@@ -1,26 +1,12 @@
 extends CharacterBody2D
 
-# =====================================================================================
-#  PLAYER  --  the "game feel" core of the platformer.
-#
-#  A platformer lives or dies by how the jump feels. Almost everything in here exists
-#  to make the controls forgiving and the character feel weighty-but-responsive:
-#
-#    * Acceleration & friction       - the player ramps up to speed instead of snapping
-#    * Coyote time                   - you can still jump for a moment after a ledge
-#    * Jump buffering                - a jump pressed just before landing still fires
-#    * Variable jump height          - tap = small hop, hold = full jump
-#    * Asymmetric gravity            - you fall faster than you rise (less floaty)
-#    * Double jump                   - an extra mid-air jump for expression & recovery
-#    * Squash & stretch              - the sprite deforms on jump / land / bounce
-#    * Dust, sounds, screen shake    - feedback on every action
-#    * Stomp                         - land on an enemy to bounce off and squash it
-#
-#  Tunable numbers live up top so they're easy to feel out.
-# =====================================================================================
+@onready var player_body:		Polygon2D			= %Body
+@onready var player_collision:	CollisionPolygon2D	= %CollisionShape
+@onready var dust_particles:	CPUParticles2D  	= %DustParticles
+@onready var camera: 			Camera2D           	= %Camera2D
 
 # --- Horizontal movement ---
-const MAX_FLOOR_SPEED: 				float				= 500.0		# top running speed
+const MAX_FLOOR_SPEED: 			float				= 500.0		# top running speed
 const FLOOR_ACCELERATION:		float				= 1300.0	# how fast we reach top speed on the ground
 const FLOOR_FRICTION:			float				= 1600.0 	# how fast we stop on the ground
 const AIR_ACCELERATION:			float				= 900.0		# weaker steering in the air...
@@ -56,13 +42,6 @@ const LAND_SQUASH_MAX:			float				= 0.36   # squash from a full-speed slam
 const JUMP_STRETCH:				float				= 0.22   # stretch on take-off
 const BOUNCE_SQUASH:			float				= 0.28   
 const SPAWN_SQUASH:				float				= 0.22   # the pop-in at level start
-const CHANGE_BODYTYPE:			float				= 0.5
-
-# --- Onready ---
-@onready var player_body:		Polygon2D			= %Body
-@onready var player_collision:	CollisionPolygon2D	= %CollisionPolygon2D
-@onready var dust_particles:	CPUParticles2D  	= %DustParticles
-@onready var camera: 			Camera2D           	= %Camera2D
 
 # --- Runtime state ---
 var air_jumps_left:				int					= 0
@@ -71,8 +50,6 @@ var jump_buffer_timer:			float				= 0.0
 var dust_cooldown:				float				= 0.0
 var was_on_floor:				bool				= false
 var is_dead:					bool				= false
-
-#$$$$$$$$$$$$# [A CACETADA DE OUTRAS COISAS - ORGANIZAR E DECUPAR]
 
 # Squash & stretch spring state 
 var squash:						float				= 0.0		# squash > 0 = squashed
@@ -100,63 +77,21 @@ const TRAIL_DURATION:			float			    = 0.35
 const AFTERIMAGE_INTERVAL:		float			 	= 0.05
 const TRAIL_COLOR: 				Color				= Color(0.6, 0.8, 1.0, 0.5)
 
-# --- Player Bodies ---
-enum BodyType { TRIANGLE, SQUARE }
 
-@export var current_body: BodyType = BodyType.TRIANGLE:
-	set(new_body):
-		current_body = new_body
-		_reshape_body()
-
-var triangle_body: PackedVector2Array = [
-	Vector2(0, -30),   # Top point
-	Vector2(-25, 25),  # Bottom-left point
-	Vector2(25, 25)
-]
-var square_body: PackedVector2Array =[
-	Vector2(-20, -15), Vector2(20, -15), 
-	Vector2(20, 25), Vector2(-20, 25)
-]
-
-
-
-# --- Wall Movement
-const WALL_GRAVITY: float = 8.5
-const WALLJUMP_VELOCITY: float = 100.0
-
-var wall_coyote: float = 0.0
-const WALL_COYOTE_TIME: float = 0.2
-
-var walljump_lock: float = 0.0
-const WALLJUMP_LOCK_TIME: float = 0.5
-
-
-var look_dir_x: int = 1
 
 
 func _ready() -> void:
-	current_body = BodyType.TRIANGLE
-	player_body.color = Color.WHITE
 	add_to_group("player")	# use get_tree().get_first_node_in_group("player") to track the player
+	
+	# set body n collision
+	player_collision.polygon = player_body.polygon
+	player_body.color = Color.WHITE
 
 	if camera:
 		base_zoom = camera.zoom   # remember the resting zoom so punches settle back
 	base_sprite_y = player_body.position.y
 	_squash_impulse(SPAWN_SQUASH)
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ctrl_key"):
-		if current_body == BodyType.TRIANGLE:
-			current_body = BodyType.SQUARE
-		else:
-			current_body = BodyType.TRIANGLE
-
-func _reshape_body() -> void:
-	var active_shape = triangle_body if current_body == BodyType.TRIANGLE else square_body
-	player_body.polygon = active_shape
-	player_collision.polygon = active_shape
-	_squash_impulse(CHANGE_BODYTYPE)
-	queue_redraw()
 
 func _physics_process(delta: float) -> void:
 	if is_dead:
@@ -175,8 +110,6 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_check_landing(fall_speed)
 
-# Camera craft lives in _process so it keeps animating smoothly even during the
-# death freeze-frame (when physics is paused).
 func _process(delta):
 	_update_squash(delta)   # drive the squash/stretch spring every frame
 
@@ -237,7 +170,7 @@ func _handle_jump(delta):
 	elif jump_buffer_timer > 0.0 and air_jumps_left > 0:
 		_do_jump(DOUBLE_JUMP_VELOCITY)
 		#_play_varied(double_jump_sound)
-		Juice.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
+		Visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
 		trail_timer = TRAIL_DURATION   # streak out of the double jump
 		air_jumps_left -= 1
 		jump_buffer_timer = 0.0
@@ -295,19 +228,22 @@ func bounce(amount: float = STOMP_BOUNCE):
 	add_zoom_punch(0.10)         # snappy push-in sells the stomp
 	trail_timer = TRAIL_DURATION # streak off the bounce
 	_squash_impulse(BOUNCE_SQUASH)
-	Juice.hit_stop(0.07)      
+	Visuals.hit_stop(0.07)      
 
 # ---------------------------------------------------------------------------
 #  FEEDBACK HELPERS
 # ---------------------------------------------------------------------------
 
+# camera stuff
 func add_shake(amount: float):
 	shake_strength = max(shake_strength, amount)
-
 
 # A quick camera push-in that springs back (see _process). Bigger = punchier.
 func add_zoom_punch(amount: float):
 	zoom_punch = max(zoom_punch, amount)
+
+
+
 
 # While the trail timer is active, drop a fading ghost on a fixed cadence.
 func _update_trail(delta: float):
@@ -395,8 +331,8 @@ func die():
 	is_dead = true
 
 	#_play_varied(hurt_sound)
-	Juice.spawn_burst(global_position + Vector2(0, -6), Color(1.0, 0.4, 0.4), 22, 150.0)
-	Juice.flash_screen(Color(0.7, 0.05, 0.05, 0.55), 0.5)   # red full-screen hit-flash
+	Visuals.spawn_burst(global_position + Vector2(0, -6), Color(1.0, 0.4, 0.4), 22, 150.0)
+	Visuals.flash_screen(Color(0.7, 0.05, 0.05, 0.55), 0.5)   # red full-screen hit-flash
 	#Music.duck()                                            # drop + muffle the music
 	add_shake(7.0)
 	add_zoom_punch(0.18)
