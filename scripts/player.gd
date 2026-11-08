@@ -172,7 +172,7 @@ func _handle_jump(delta):
 	elif jump_buffer_timer > 0.0 and air_jumps_left > 0:
 		_do_jump(DOUBLE_JUMP_VELOCITY)
 		#_play_varied(double_jump_sound)
-		Visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
+		Juice.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
 		trail_timer = TRAIL_DURATION   # streak out of the double jump
 		air_jumps_left -= 1
 		jump_buffer_timer = 0.0
@@ -208,8 +208,8 @@ func die():
 	is_dead = true
 
 	#_play_varied(hurt_sound)
-	Visuals.spawn_burst(global_position + Vector2(0, -6), Color(1.0, 0.4, 0.4), 22, 150.0)
-	Visuals.flash_screen(Color(0.7, 0.05, 0.05, 0.55), 0.5)   # red full-screen hit-flash
+	Juice.spawn_burst(global_position + Vector2(0, -6), Color(1.0, 0.4, 0.4), 22, 150.0)
+	Juice.flash_screen(Color(0.7, 0.05, 0.05, 0.55), 0.5)   # red full-screen hit-flash
 	#Music.duck()                                            # drop + muffle the music
 	add_shake(7.0)
 	add_zoom_punch(0.18)
@@ -251,7 +251,7 @@ func bounce(amount: float = STOMP_BOUNCE):
 	add_zoom_punch(0.10)         # snappy push-in sells the stomp
 	trail_timer = TRAIL_DURATION # streak off the bounce
 	_squash_impulse(BOUNCE_SQUASH)
-	Visuals.hit_stop(0.07)   
+	Juice.hit_stop(0.07)   
 
 # ---------------------------------------------------------------------------
 #  HELPERS
@@ -277,11 +277,11 @@ func _update_trail(delta: float):
 
 # Snapshots the current sprite frame as a static ghost that fades out in place.
 func _spawn_afterimage():
-	var body_shape: PackedVector2Array = player_body.polygon
+	var body_shape: PackedVector2Array = [Vector2(-20,-20),Vector2(20,-20),Vector2(20,20),Vector2(-20,20)]
 	if body_shape == null:
 		return
 	var ghost := Polygon2D.new()
-	ghost.polygon = player_body.polygon
+	ghost.polygon = body_shape
 	ghost.global_position = player_body.global_position
 	ghost.scale = player_body.scale
 	ghost.modulate = TRAIL_COLOR
