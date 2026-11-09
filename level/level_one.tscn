@@ -1,10 +1,16 @@
 [gd_scene format=3 uid="uid://piijqd14i7tq"]
 
 [ext_resource type="Script" uid="uid://cslsw6uc02okp" path="res://level/killzone.gd" id="1_bo08i"]
+[ext_resource type="PackedScene" uid="uid://cdum8b36ycycv" path="res://level/platform_dynamic.tscn" id="2_e2cj4"]
 [ext_resource type="PackedScene" uid="uid://1jb22rygluat" path="res://player/player_scene.tscn" id="2_foyw7"]
+
+[sub_resource type="FontVariation" id="FontVariation_bxc86"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_jrljy"]
 size = Vector2(308, 110)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_u1bno"]
+size = Vector2(7884, 110)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_5klxn"]
 size = Vector2(2925, 105)
@@ -15,9 +21,26 @@ size = Vector2(1179, 56.00003)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_glv2v"]
 size = Vector2(475.50003, 61)
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_evjnm"]
+size = Vector2(299, 62.25)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_e2cj4"]
+size = Vector2(103.5, 189.5)
+
 [node name="Level One" type="Node2D" unique_id=836972346]
 
 [node name="Scenario" type="Node2D" parent="." unique_id=553546201]
+
+[node name="Label" type="Label" parent="Scenario" unique_id=227520547]
+offset_left = 321.0
+offset_top = 361.0
+offset_right = 427.0
+offset_bottom = 462.0
+theme_override_fonts/font = SubResource("FontVariation_bxc86")
+text = "          ← / →
+SPACE = jump
+SHIFT = dash
+      ← / →"
 
 [node name="WhiteSubtraction" type="DirectionalLight2D" parent="Scenario" unique_id=992816106]
 visible = false
@@ -31,6 +54,11 @@ script = ExtResource("1_bo08i")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Scenario/Killzone" unique_id=728989687]
 position = Vector2(1, 16)
 shape = SubResource("RectangleShape2D_jrljy")
+debug_color = Color(0.9799214, 0, 0.3879387, 0.41960785)
+
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="Scenario/Killzone" unique_id=1122986338]
+position = Vector2(1118, 231)
+shape = SubResource("RectangleShape2D_u1bno")
 debug_color = Color(0.9799214, 0, 0.3879387, 0.41960785)
 
 [node name="Floor" type="StaticBody2D" parent="Scenario" unique_id=483137816]
@@ -63,6 +91,37 @@ position = Vector2(770, -213.75)
 rotation = 1.5707964
 shape = SubResource("RectangleShape2D_glv2v")
 debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
+
+[node name="Plats" type="StaticBody2D" parent="Scenario" unique_id=2000673739]
+position = Vector2(1062, 267)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Scenario/Plats" unique_id=1720497708]
+shape = SubResource("RectangleShape2D_evjnm")
+debug_color = Color(0.4897673, 0.49216515, 0.831723, 0.41960785)
+
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="Scenario/Plats" unique_id=883480869]
+position = Vector2(623, 122)
+shape = SubResource("RectangleShape2D_evjnm")
+debug_color = Color(0.4897673, 0.49216515, 0.831723, 0.41960785)
+
+[node name="CollisionShape2D3" type="CollisionShape2D" parent="Scenario/Plats" unique_id=1570817643]
+position = Vector2(999, -61)
+shape = SubResource("RectangleShape2D_evjnm")
+debug_color = Color(0.4897673, 0.49216515, 0.831723, 0.41960785)
+
+[node name="CollisionShape2D4" type="CollisionShape2D" parent="Scenario/Plats" unique_id=1333528672]
+position = Vector2(407.75, -215.125)
+shape = SubResource("RectangleShape2D_evjnm")
+debug_color = Color(0.4897673, 0.49216515, 0.831723, 0.41960785)
+
+[node name="CollisionShape2D5" type="CollisionShape2D" parent="Scenario/Plats" unique_id=251158877]
+position = Vector2(310, -296)
+shape = SubResource("RectangleShape2D_e2cj4")
+debug_color = Color(0.4897673, 0.49216515, 0.831723, 0.41960785)
+
+[node name="MovingPlatform" parent="." unique_id=1022344941 instance=ExtResource("2_e2cj4")]
+position = Vector2(472, 345)
 
 [node name="Player" parent="." unique_id=1260122610 instance=ExtResource("2_foyw7")]
 position = Vector2(217, 430)

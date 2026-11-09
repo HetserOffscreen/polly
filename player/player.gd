@@ -38,7 +38,7 @@ var can_dash:					bool	= true
 
 # --- Wall Movement ---
 @export_group("Wall Movement")
-@export var WALL_SLIDE_SPEED: 	float	= 120.0
+@export var WALL_SLIDE_SPEED: 	float	= 120.0 # FIX -not working properly
 @export var WALL_HANG_DURATION: float	= 0.12     # Hold momentarily before sliding
 @export var WALL_JUMP_FORCE:	Vector2	= Vector2(420.0, -420.0) # X = push out, Y = upward lift
 const WALL_COYOTE_TIME: 		float	= 0.15
@@ -74,7 +74,8 @@ func _ready() -> void:
 	# use get_tree().get_first_node_in_group("player") to track the player
 	add_to_group("player")
 	player_collision.polygon = player_body.polygon
-	player_body.color = Color.BLACK
+	player_body.color = Color.WHITE
+	get_tree().debug_collisions_hint = true
 
 func _physics_process(delta: float) -> void:
 	if is_dead:
