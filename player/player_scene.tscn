@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://1jb22rygluat"]
 
-[ext_resource type="Script" uid="uid://bvli2sbutv2nl" path="res://components/player/player.gd" id="1_crmta"]
-[ext_resource type="Script" uid="uid://c6qnyum3ompa1" path="res://components/player/player_visuals.gd" id="2_vefth"]
+[ext_resource type="Script" uid="uid://bvli2sbutv2nl" path="res://player/player.gd" id="1_crmta"]
+[ext_resource type="Script" uid="uid://c6qnyum3ompa1" path="res://player/player_visuals.gd" id="2_vefth"]
 
 [sub_resource type="CanvasTexture" id="CanvasTexture_crmta"]
 

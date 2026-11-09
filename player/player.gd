@@ -1,60 +1,64 @@
 extends CharacterBody2D
 
+enum State {IDLE, RUN, AIR, DASH}
+var active_state:= State.IDLE
+
 @onready var player_body:		Polygon2D			= %Body
 @onready var player_collision:	CollisionPolygon2D	= %CollisionShape
 @onready var dust_particles:	CPUParticles2D  	= %DustParticles
 @onready var camera: 			Camera2D           	= %Camera2D
-@onready var visuals:			Node				= %Visuals
+@onready var visuals:			Node2D				= %Visuals
 
 # --- Horizontal movement ---
 @export_group("Horizontal Movement")
-@export var FLOOR_MAX_SPEED: 		float		= 500.0
-@export var FLOOR_ACCELERATION:		float		= 1300.0
-@export var FLOOR_FRICTION:			float		= 1800.0
-@export var AIR_ACCELERATION:		float		= 900.0		# weaker steering in the air...
-@export var AIR_FRICTION:			float		= 300.0   	# longer momentum
+@export var FLOOR_MAX_SPEED: 	float	= 500.0
+@export var FLOOR_ACCELERATION:	float	= 1300.0
+@export var FLOOR_FRICTION:		float	= 1800.0
+@export var AIR_ACCELERATION:	float	= 900.0		# weaker steering in the air...
+@export var AIR_FRICTION:		float	= 300.0   	# longer momentum
 
 # --- Jumping ---
 @export_group("Jumping")
-@export var JUMP_VELOCITY: 			float		= -450.0	# jump max height
-@export var DOUBLE_JUMP_VELOCITY: 	float		= -300.0  	# the second (air) jump, a touch weaker
-@export var JUMP_CUT: 				float		= 0.45		
-@export var STOMP_BOUNCE: 			float		= -260.0  	# upward kick when you stomp an enemy 
-@export var MAX_FALL_SPEED: 		float		= 900.0   	# terminal velocity so falls stay controllable
-@export var MAX_AIR_JUMPS: 			int  		= 2       	
+@export var JUMP_HEIGHT: 		float	= -450.0	# jump max height
+@export var DOUBLE_JUMP_HEIGHT: float	= -300.0  	# weaker
+@export var JUMP_CUT: 			float	= 0.45
+@export var STOMP_BOUNCE: 		float	= -260.0
+@export var MAX_FALL_SPEED: 	float	= 900.0
+@export var MAX_AIR_JUMPS: 		int  	= 2
+
+# --- Dashing ---
+@export_group("Dashing")
+@export var dash_timer:			float	= 0.0
+@export var dash_direction:		float	= 1.0
+const DASH_SPEED:				float	= 600.0
+const DASH_DURATION:			float	= 0.2
 
 # --- Gravity feel ---
 @export_group("Gravity feel")
-const RISE_GRAVITY_MULT: 		float			= 0.9		# a little floaty on the way up
-const FALL_GRAVITY_MULT:		float			= 3.0		# snappier on the way down
-const APEX_SPEED_THRESHOLD:		float			= 45.0		# |vertical speed| under this = "near the apex"
-const APEX_GRAVITY_MULT: 		float			= 0.55		# extra-light gravity inside the hang window
-const BASE_GRAVITY:				float			= 980.0		# value in px/s²
-
+const RISE_GRAVITY_MULT: 		float	= 0.9		# a little floaty on the way up
+const FALL_GRAVITY_MULT:		float	= 3.0		# snappier on the way down
+const APEX_SPEED_THRESHOLD:		float	= 45.0		# |vertical speed| under this = "near the apex"
+const APEX_GRAVITY_MULT: 		float	= 0.55		# extra-light gravity inside the hang window
+const BASE_GRAVITY:				float	= 980.0		# value in px/s²
 
 # --- Forgiveness windows (seconds) ---
-const COYOTE_TIME: 				float			= 0.10		
-const JUMP_BUFFER: 				float			= 0.10		
-const CORNER_CORRECTION_PIXELS: int	 			= 4			# value in Pixels
+const COYOTE_TIME: 				float	= 0.10		
+const JUMP_BUFFER: 				float	= 0.10		
+const CORNER_CORRECTION_PIXELS: int	 	= 4			# value in Pixels
 
 # --- Runtime state aand Flags ---
-var air_jumps_left:				int				= 0
-var coyote_timer:				float			= 0.0
-var jump_buffer_timer:			float			= 0.0
-var dust_cooldown:				float			= 0.0
-var was_on_floor:				bool			= false
-var is_dead:					bool			= false
-
-
-enum State {IDLE, RUN, AIR, DASH, HURT}
-var active_state: State = State.IDLE
+var air_jumps_left:				int		= 0
+var coyote_timer:				float	= 0.0
+var jump_buffer_timer:			float	= 0.0
+var dust_cooldown:				float	= 0.0
+var was_on_floor:				bool	= false
+var is_dead:					bool	= false
 
 func _ready() -> void:
 	# use get_tree().get_first_node_in_group("player") to track the player
 	add_to_group("player")
 	player_collision.polygon = player_body.polygon
 	player_body.color = Color.BLACK
-
 
 func _physics_process(delta: float) -> void:
 	if is_dead:
@@ -69,6 +73,8 @@ func _physics_process(delta: float) -> void:
 	var fall_speed = velocity.y
 	move_and_slide()
 	_check_landing(fall_speed)
+
+	#print(State.find_key(active_state))
 
 # ---------------------------------------------------------------------------
 #  STATE MACHINE
@@ -91,14 +97,18 @@ func _process_state(delta: float) -> void:
 	
 	# Universal Ground Jump
 	if active_state != State.AIR and jump_buffer_timer > 0.0 and coyote_timer > 0.0:
-		_do_jump(JUMP_VELOCITY)
+		_do_jump(JUMP_HEIGHT)
 		AudioManager.play_sound("jump")
 		jump_buffer_timer = 0.0
 		coyote_timer = 0.0
 		_switch_state(State.AIR)
 		return
 	
-	
+	# DASH
+	if active_state != State.DASH:
+		_do_dash()
+		#AudioManager.play_sound("dash")
+
 	# State Behavior & Transition Triggers
 	match active_state:
 		State.IDLE:
@@ -131,7 +141,7 @@ func _process_state(delta: float) -> void:
 
 			# Air jump (Double Jump)
 			if jump_buffer_timer > 0.0 and air_jumps_left > 0:
-				_do_jump(DOUBLE_JUMP_VELOCITY)
+				_do_jump(DOUBLE_JUMP_HEIGHT)
 				AudioManager.play_sound("double_jump")
 				visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
 				visuals.activate_trail()
@@ -145,10 +155,19 @@ func _process_state(delta: float) -> void:
 			if is_on_floor():
 				_switch_state(State.IDLE if direction == 0.0 else State.RUN)
 
-		State.HURT:
-			pass
+		State.DASH:
+			velocity.x = dash_direction * DASH_SPEED
+			dash_timer -= delta
 
-
+			visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
+			visuals.activate_trail()
+			
+			# Trigger
+			if dash_timer <= 0.0:
+				if direction != 0.0:
+					_switch_state(State.RUN)
+				else:
+					_switch_state(State.IDLE)
 
 #  Entry - One Time Operations
 func _switch_state(to_state: State) -> void:
@@ -165,8 +184,9 @@ func _switch_state(to_state: State) -> void:
 		State.AIR:
 			pass
 
-		State.HURT:
-			pass
+		State.DASH:
+			#reset timer
+			dash_timer = DASH_DURATION
 
 	active_state = to_state
 
@@ -199,6 +219,13 @@ func _do_jump(jump_force: float):
 	visuals.trigger_jump_stretch()   # stretch tall on take-off
 	visuals.spawn_dust(6)
 
+func _do_dash() -> void:
+	var direction := Input.get_axis("move_left", "move_right")
+	
+	if Input.is_action_just_pressed("dash"):
+			dash_direction = direction
+			_switch_state(State.DASH)
+
 func _corner_correction():
 	if velocity.y >= 0.0:
 		return
@@ -220,7 +247,7 @@ func die():
 		return
 	is_dead = true
 
-	_switch_state(State.HURT)
+	#_switch_state(State.HURT)
 
 	AudioManager.play_sound("hurt")
 	visuals.spawn_burst(global_position + Vector2(0, -6), Color(1.0, 0.4, 0.4), 22, 150.0)

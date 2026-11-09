@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://piijqd14i7tq"]
 
-[ext_resource type="Script" uid="uid://cslsw6uc02okp" path="res://components/killzone.gd" id="1_t18mc"]
-[ext_resource type="PackedScene" uid="uid://1jb22rygluat" path="res://components/player/player_scene.tscn" id="2_843q2"]
+[ext_resource type="Script" uid="uid://cslsw6uc02okp" path="res://level/killzone.gd" id="1_bo08i"]
+[ext_resource type="PackedScene" uid="uid://1jb22rygluat" path="res://player/player_scene.tscn" id="2_foyw7"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_jrljy"]
 size = Vector2(308, 110)
@@ -26,7 +26,7 @@ blend_mode = 1
 [node name="Killzone" type="Area2D" parent="Scenario" unique_id=488430628]
 position = Vector2(119, 650)
 collision_layer = 2
-script = ExtResource("1_t18mc")
+script = ExtResource("1_bo08i")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Scenario/Killzone" unique_id=728989687]
 position = Vector2(1, 16)
@@ -38,7 +38,7 @@ position = Vector2(588, 567)
 collision_layer = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Scenario/Floor" unique_id=1570704685]
-position = Vector2(999, 42.5)
+position = Vector2(998, 42.5)
 shape = SubResource("RectangleShape2D_5klxn")
 debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
 
@@ -53,18 +53,18 @@ shape = SubResource("RectangleShape2D_t18mc")
 debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
 
 [node name="CollisionShape2D2" type="CollisionShape2D" parent="Scenario/Walls" unique_id=778935523]
-position = Vector2(1049, -380)
+position = Vector2(559, -564)
 rotation = 1.5707964
 shape = SubResource("RectangleShape2D_glv2v")
 debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
 
 [node name="CollisionShape2D3" type="CollisionShape2D" parent="Scenario/Walls" unique_id=1069837383]
-position = Vector2(1276, -198.75)
+position = Vector2(786, -382.75)
 rotation = 1.5707964
 shape = SubResource("RectangleShape2D_glv2v")
 debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
 
-[node name="Player" parent="." unique_id=1260122610 instance=ExtResource("2_843q2")]
+[node name="Player" parent="." unique_id=1260122610 instance=ExtResource("2_foyw7")]
 position = Vector2(217, 430)
 
 [connection signal="body_entered" from="Scenario/Killzone" to="Scenario/Killzone" method="_on_body_entered"]
