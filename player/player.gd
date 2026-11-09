@@ -79,7 +79,6 @@ func _physics_process(delta: float) -> void:
 # ---------------------------------------------------------------------------
 #  STATE MACHINE
 # ---------------------------------------------------------------------------
-
 func _process_state(delta: float) -> void:
 	var direction := Input.get_axis("move_left", "move_right")
 	
@@ -88,9 +87,7 @@ func _process_state(delta: float) -> void:
 		return # Interrupted this frame (e.g., just started a jump or dash)
 
 	if active_state != State.DASH:
-		_handle_horizontal_movement(delta)
-
-
+		_handle_horizontal_movement(delta, direction)
 
 	# State Behavior & Transition Triggers
 	match active_state:
@@ -99,12 +96,11 @@ func _process_state(delta: float) -> void:
 		State.AIR:	_update_air(delta, direction)
 		State.DASH:	_update_dash(delta, direction)
 
-
-#  Entry - One Time Operations
 func _switch_state(new_state: State) -> void:
 	if new_state == active_state:
 		return
-
+	
+	#  Entry - One Time Operations
 	match new_state:
 		State.IDLE:
 			pass
@@ -120,14 +116,14 @@ func _switch_state(new_state: State) -> void:
 
 	active_state = new_state
 
-func _update_idle(_delta: float, direction) -> void:
+func _update_idle(_delta: float, direction: float) -> void:
 	# Trigger
 	if direction != 0.0:
 		_switch_state(State.RUN)
 	elif not is_on_floor():
 		_switch_state(State.AIR)
 
-func _update_run(delta: float, direction) -> void:
+func _update_run(delta: float, direction: float) -> void:
 	# Dust Animation
 	if is_on_floor() and abs(velocity.x) > 40.0:
 		dust_cooldown -= delta
@@ -141,7 +137,7 @@ func _update_run(delta: float, direction) -> void:
 	elif not is_on_floor():
 		_switch_state(State.AIR)
 
-func _update_air(_delta: float, direction) -> void:
+func _update_air(_delta: float, direction: float) -> void:
 	# Air jump (Double Jump)
 	if jump_buffer_timer > 0.0 and air_jumps_left > 0:
 		_jump(DOUBLE_JUMP_HEIGHT)
@@ -157,7 +153,7 @@ func _update_air(_delta: float, direction) -> void:
 	if is_on_floor():
 		_switch_state(State.IDLE if direction == 0.0 else State.RUN)
 
-func _update_dash(delta: float, direction) -> void:
+func _update_dash(delta: float, direction: float) -> void:
 	velocity.x = dash_direction * DASH_SPEED
 	dash_timer -= delta
 	
@@ -211,8 +207,8 @@ func _apply_gravity(delta):
 		velocity.y += BASE_GRAVITY * mult * delta
 		velocity.y = min(velocity.y, MAX_FALL_SPEED)
 
-func _handle_horizontal_movement(delta: float) -> void:
-	var direction := Input.get_axis("move_left", "move_right")
+func _handle_horizontal_movement(delta: float, direction) -> void:
+	#var direction := Input.get_axis("move_left", "move_right")
 	if direction != 0.0:
 		dash_direction = direction # Continuously remember the last direction moved/faced
 		var accel := FLOOR_ACCELERATION if is_on_floor() else AIR_ACCELERATION
