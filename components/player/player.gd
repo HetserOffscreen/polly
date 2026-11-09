@@ -50,8 +50,8 @@ enum State {IDLE, RUN, AIR, DASH, HURT}
 var active_state: State = State.IDLE
 
 func _ready() -> void:
-	add_to_group("player")	# use get_tree().get_first_node_in_group("player") to track the player
-	# set body n collision
+	# use get_tree().get_first_node_in_group("player") to track the player
+	add_to_group("player")
 	player_collision.polygon = player_body.polygon
 	player_body.color = Color.BLACK
 
@@ -70,8 +70,10 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_check_landing(fall_speed)
 
+# ---------------------------------------------------------------------------
+#  STATE MACHINE
+# ---------------------------------------------------------------------------
 
-# Game Loop / State Triggers and Definitions
 func _process_state(delta: float) -> void:
 	var direction := Input.get_axis("move_left", "move_right")
 
@@ -87,7 +89,7 @@ func _process_state(delta: float) -> void:
 	else:
 		jump_buffer_timer = max(jump_buffer_timer - delta, 0.0)
 	
-	# 2. Universal Ground Jump
+	# Universal Ground Jump
 	if active_state != State.AIR and jump_buffer_timer > 0.0 and coyote_timer > 0.0:
 		_do_jump(JUMP_VELOCITY)
 		AudioManager.play_sound("jump")
@@ -97,12 +99,12 @@ func _process_state(delta: float) -> void:
 		return
 	
 	
-	# State Behavior & Transitions
+	# State Behavior & Transition Triggers
 	match active_state:
 		State.IDLE:
 			_handle_horizontal_movement(delta)
 
-			# Triggers
+			# Trigger
 			if direction != 0.0:
 				_switch_state(State.RUN)
 			elif not is_on_floor():
@@ -118,7 +120,7 @@ func _process_state(delta: float) -> void:
 					dust_cooldown = 0.2
 					visuals.spawn_dust(3)
 
-			# Triggers
+			# Trigger
 			if direction == 0.0:
 				_switch_state(State.IDLE)
 			elif not is_on_floor():
@@ -135,7 +137,7 @@ func _process_state(delta: float) -> void:
 				visuals.activate_trail()
 				air_jumps_left -= 1
 				jump_buffer_timer = 0.0
-			# Variable jump height cut
+			
 			if Input.is_action_just_released("jump") and velocity.y < 0.0:
 				velocity.y *= JUMP_CUT
 
@@ -183,7 +185,6 @@ func _apply_gravity(delta):
 		velocity.y += BASE_GRAVITY * mult * delta
 		velocity.y = min(velocity.y, MAX_FALL_SPEED)
 
-
 func _handle_horizontal_movement(delta: float) -> void:
 	var direction := Input.get_axis("move_left", "move_right")
 	if direction != 0.0:
@@ -193,11 +194,26 @@ func _handle_horizontal_movement(delta: float) -> void:
 		var fric := FLOOR_FRICTION if is_on_floor() else AIR_FRICTION
 		velocity.x = move_toward(velocity.x, 0.0, fric * delta)
 
-
 func _do_jump(jump_force: float):
 	velocity.y = jump_force
 	visuals.trigger_jump_stretch()   # stretch tall on take-off
 	visuals.spawn_dust(6)
+
+func _corner_correction():
+	if velocity.y >= 0.0:
+		return
+	var motion := Vector2(0.0, velocity.y) * get_physics_process_delta_time()
+	if not test_move(global_transform, motion):
+		return  # clear path up — nothing to correct
+	for offset in range(1, CORNER_CORRECTION_PIXELS + 1):
+		for dir in [1, -1]:
+			var shift := Vector2(dir * offset, 0.0)
+			# The nudge itself must be unobstructed, and must clear the ceiling.
+			if test_move(global_transform, shift):
+				continue
+			if not test_move(global_transform.translated(shift), motion):
+				global_position.x += dir * offset
+				return
 
 func die():
 	if is_dead:
@@ -229,17 +245,20 @@ func _check_landing(fall_speed: float):
 	# Just touched down this frame.
 	if is_on_floor() and not was_on_floor:
 		var impact = max(fall_speed, 0.0)  # downward speed at the moment of impact
-		AudioManager.play_sound("land")
+		
 		# Squish the player on impact — harder falls flatten more, but even a soft
 		# hop gets a clear squish. The spring then bounces it back through a stretch.
 		visuals.trigger_land_squash(impact)
 		visuals.spawn_dust(clamp(int(impact / 35.0), 4, 14))
+		
 		# Only real falls shake the screen — a normal hop barely registers.
 		visuals.add_shake(clamp((impact - 120.0) / 220.0, 0.0, 2.0))
 		visuals.add_zoom_punch(clamp(impact / 1400.0, 0.0, 0.05))
+		
+		AudioManager.play_sound("land")
 
-# Called by an enemy when we land on its head: pop upward, refresh the air jump,
-# and pile on the feedback (a freeze-frame, a shake, a squash) to sell the hit.
+# Called by an enemy when we land on its head:
+# pop upward, refresh the air jump, and pile on the feedback (a freeze-frame, a shake, a squash) to sell the hit.
 # Enemies are Area2D-based, so they detect the stomp and call this on us.
 func bounce(amount: float = STOMP_BOUNCE):
 	velocity.y = amount
@@ -250,27 +269,3 @@ func bounce(amount: float = STOMP_BOUNCE):
 	visuals.activate_trail()             # streak off the bounce
 	visuals.trigger_bounce_squash()
 	visuals.hit_stop(0.07)
-
-
-# ---------------------------------------------------------------------------
-#  HELPERS
-# ---------------------------------------------------------------------------
-
-# Ceiling corner correction: while rising, if the head is blocked but a tiny
-# sideways nudge would clear the corner, take it. Turns cheap head-bonks into
-# smooth slips past tile edges. No-op when there's nothing above you.
-func _corner_correction():
-	if velocity.y >= 0.0:
-		return
-	var motion := Vector2(0.0, velocity.y) * get_physics_process_delta_time()
-	if not test_move(global_transform, motion):
-		return  # clear path up — nothing to correct
-	for offset in range(1, CORNER_CORRECTION_PIXELS + 1):
-		for dir in [1, -1]:
-			var shift := Vector2(dir * offset, 0.0)
-			# The nudge itself must be unobstructed, and must clear the ceiling.
-			if test_move(global_transform, shift):
-				continue
-			if not test_move(global_transform.translated(shift), motion):
-				global_position.x += dir * offset
-				return
