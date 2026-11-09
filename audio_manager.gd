@@ -13,9 +13,6 @@ var sound_library = {
 	"jump": 
 		preload("uid://c7d6ku5bgcbqp"),
 
-	"double_jump": 
-		preload("uid://28pfqudomll3"),
-
 	"dash": 
 		preload("uid://28pfqudomll3"),
 

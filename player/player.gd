@@ -82,7 +82,94 @@ func _physics_process(delta: float) -> void:
 
 func _process_state(delta: float) -> void:
 	var direction := Input.get_axis("move_left", "move_right")
+	
+	# Global Inputs & Timers Router
+	if _handle_global_inputs(delta):
+		return # Interrupted this frame (e.g., just started a jump or dash)
 
+	if active_state != State.DASH:
+		_handle_horizontal_movement(delta)
+
+
+
+	# State Behavior & Transition Triggers
+	match active_state:
+		State.IDLE:	_update_idle(delta, direction)
+		State.RUN:	_update_run(delta, direction)
+		State.AIR:	_update_air(delta, direction)
+		State.DASH:	_update_dash(delta, direction)
+
+
+#  Entry - One Time Operations
+func _switch_state(new_state: State) -> void:
+	if new_state == active_state:
+		return
+
+	match new_state:
+		State.IDLE:
+			pass
+
+		State.RUN:
+			pass
+
+		State.AIR:
+			pass
+
+		State.DASH:
+			dash_timer = DASH_DURATION
+
+	active_state = new_state
+
+func _update_idle(_delta: float, direction) -> void:
+	# Trigger
+	if direction != 0.0:
+		_switch_state(State.RUN)
+	elif not is_on_floor():
+		_switch_state(State.AIR)
+
+func _update_run(delta: float, direction) -> void:
+	# Dust Animation
+	if is_on_floor() and abs(velocity.x) > 40.0:
+		dust_cooldown -= delta
+		if dust_cooldown <= 0.0:
+			dust_cooldown = 0.2
+			visuals.spawn_dust(3)
+
+	# Trigger
+	if direction == 0.0:
+		_switch_state(State.IDLE)
+	elif not is_on_floor():
+		_switch_state(State.AIR)
+
+func _update_air(_delta: float, direction) -> void:
+	# Air jump (Double Jump)
+	if jump_buffer_timer > 0.0 and air_jumps_left > 0:
+		_jump(DOUBLE_JUMP_HEIGHT)
+		visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
+		visuals.activate_trail()
+		air_jumps_left -= 1
+		jump_buffer_timer = 0.0
+	
+	if Input.is_action_just_released("jump") and velocity.y < 0.0:
+		velocity.y *= JUMP_CUT
+
+	# Trigger
+	if is_on_floor():
+		_switch_state(State.IDLE if direction == 0.0 else State.RUN)
+
+func _update_dash(delta: float, direction) -> void:
+	velocity.x = dash_direction * DASH_SPEED
+	dash_timer -= delta
+	
+	# Trigger
+	if dash_timer <= 0.0:
+		if direction != 0.0:
+			_switch_state(State.RUN)
+		else:
+			_switch_state(State.IDLE)
+
+func _handle_global_inputs(delta: float) -> bool:
+	# Handle timers, jump buffering, and global triggers (Jump/Dash)
 	# Update timers globally for ground states
 	if is_on_floor():
 		coyote_timer = COYOTE_TIME
@@ -97,99 +184,18 @@ func _process_state(delta: float) -> void:
 	
 	# Universal Ground Jump
 	if active_state != State.AIR and jump_buffer_timer > 0.0 and coyote_timer > 0.0:
-		_do_jump(JUMP_HEIGHT)
-		AudioManager.play_sound("jump")
+		_jump(JUMP_HEIGHT)
 		jump_buffer_timer = 0.0
 		coyote_timer = 0.0
 		_switch_state(State.AIR)
-		return
+		return true
 	
-	# DASH
-	if active_state != State.DASH:
-		_do_dash()
-		#AudioManager.play_sound("dash")
-
-	# State Behavior & Transition Triggers
-	match active_state:
-		State.IDLE:
-			_handle_horizontal_movement(delta)
-
-			# Trigger
-			if direction != 0.0:
-				_switch_state(State.RUN)
-			elif not is_on_floor():
-				_switch_state(State.AIR)
-
-		State.RUN:
-			_handle_horizontal_movement(delta)
-
-			# Dust Animation
-			if is_on_floor() and abs(velocity.x) > 40.0:
-				dust_cooldown -= delta
-				if dust_cooldown <= 0.0:
-					dust_cooldown = 0.2
-					visuals.spawn_dust(3)
-
-			# Trigger
-			if direction == 0.0:
-				_switch_state(State.IDLE)
-			elif not is_on_floor():
-				_switch_state(State.AIR)
-
-		State.AIR:
-			_handle_horizontal_movement(delta)
-
-			# Air jump (Double Jump)
-			if jump_buffer_timer > 0.0 and air_jumps_left > 0:
-				_do_jump(DOUBLE_JUMP_HEIGHT)
-				AudioManager.play_sound("double_jump")
-				visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
-				visuals.activate_trail()
-				air_jumps_left -= 1
-				jump_buffer_timer = 0.0
-			
-			if Input.is_action_just_released("jump") and velocity.y < 0.0:
-				velocity.y *= JUMP_CUT
-
-			# Trigger
-			if is_on_floor():
-				_switch_state(State.IDLE if direction == 0.0 else State.RUN)
-
-		State.DASH:
-			velocity.x = dash_direction * DASH_SPEED
-			dash_timer -= delta
-
-			visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
-			visuals.activate_trail()
-			
-			# Trigger
-			if dash_timer <= 0.0:
-				if direction != 0.0:
-					_switch_state(State.RUN)
-				else:
-					_switch_state(State.IDLE)
-
-#  Entry - One Time Operations
-func _switch_state(to_state: State) -> void:
-	if to_state == active_state:
-		return
-
-	match active_state:
-		State.IDLE:
-			pass
-
-		State.RUN:
-			pass
-
-		State.AIR:
-			pass
-
-		State.DASH:
-			#reset timer
-			dash_timer = DASH_DURATION
-
-	active_state = to_state
-
+	# Dash Input Check
+	if active_state != State.DASH and Input.is_action_just_pressed("dash"):
+		_dash()
+		return true
+	
+	return false
 
 # ---------------------------------------------------------------------------
 #  MOVEMENT
@@ -208,25 +214,24 @@ func _apply_gravity(delta):
 func _handle_horizontal_movement(delta: float) -> void:
 	var direction := Input.get_axis("move_left", "move_right")
 	if direction != 0.0:
+		dash_direction = direction # Continuously remember the last direction moved/faced
 		var accel := FLOOR_ACCELERATION if is_on_floor() else AIR_ACCELERATION
 		velocity.x = move_toward(velocity.x, direction * FLOOR_MAX_SPEED, accel * delta)
 	else:
 		var fric := FLOOR_FRICTION if is_on_floor() else AIR_FRICTION
 		velocity.x = move_toward(velocity.x, 0.0, fric * delta)
 
-func _do_jump(jump_force: float):
+func _jump(jump_force: float):
+	AudioManager.play_sound("jump")
 	velocity.y = jump_force
 	visuals.trigger_jump_stretch()   # stretch tall on take-off
 	visuals.spawn_dust(6)
 
-func _do_dash() -> void:
-	var direction := Input.get_axis("move_left", "move_right")
-	if direction != 0.0:
-		dash_direction = direction
-
-	if Input.is_action_just_pressed("dash"):
-		AudioManager.play_sound("dash")
-		_switch_state(State.DASH)
+func _dash() -> void:
+	AudioManager.play_sound("dash")
+	visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
+	visuals.activate_trail()
+	_switch_state(State.DASH)
 
 func _corner_correction():
 	if velocity.y >= 0.0:
@@ -265,7 +270,6 @@ func die():
 	await get_tree().create_timer(0.8, true, false, true).timeout
 	Engine.time_scale = 1.0
 	get_tree().reload_current_scene()
-
 
 # ---------------------------------------------------------------------------
 #  LANDING & STOMPING
