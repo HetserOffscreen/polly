@@ -150,7 +150,7 @@ func _process_state(delta: float) -> void:
 
 
 
-#  One Time Operations / Transitions
+#  Entry - One Time Operations
 func _switch_state(to_state: State) -> void:
 	if to_state == active_state:
 		return
