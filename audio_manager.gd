@@ -3,7 +3,7 @@ extends AudioStreamPlayer2D
 var sound_library = {
 	"hurt":
 		preload("uid://30n2qpcdvrsh"),
-	
+
 	"land":
 		preload("uid://i532dau6x02s"),
 	

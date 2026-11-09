@@ -221,10 +221,12 @@ func _do_jump(jump_force: float):
 
 func _do_dash() -> void:
 	var direction := Input.get_axis("move_left", "move_right")
-	
+	if direction != 0.0:
+		dash_direction = direction
+
 	if Input.is_action_just_pressed("dash"):
-			dash_direction = direction
-			_switch_state(State.DASH)
+		AudioManager.play_sound("dash")
+		_switch_state(State.DASH)
 
 func _corner_correction():
 	if velocity.y >= 0.0:
