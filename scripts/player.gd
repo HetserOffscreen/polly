@@ -51,7 +51,6 @@ var active_state: State = State.IDLE
 
 func _ready() -> void:
 	add_to_group("player")	# use get_tree().get_first_node_in_group("player") to track the player
-	
 	# set body n collision
 	player_collision.polygon = player_body.polygon
 	player_body.color = Color.BLACK
@@ -91,6 +90,7 @@ func _process_state(delta: float) -> void:
 	# 2. Universal Ground Jump
 	if active_state != State.AIR and jump_buffer_timer > 0.0 and coyote_timer > 0.0:
 		_do_jump(JUMP_VELOCITY)
+		AudioManager.jump_sfx.emit()
 		jump_buffer_timer = 0.0
 		coyote_timer = 0.0
 		_switch_state(State.AIR)
@@ -101,7 +101,7 @@ func _process_state(delta: float) -> void:
 	match active_state:
 		State.IDLE:
 			_handle_horizontal_movement(delta)
-			
+
 			# Triggers
 			if direction != 0.0:
 				_switch_state(State.RUN)
@@ -130,6 +130,7 @@ func _process_state(delta: float) -> void:
 			# Air jump (Double Jump)
 			if jump_buffer_timer > 0.0 and air_jumps_left > 0:
 				_do_jump(DOUBLE_JUMP_VELOCITY)
+				AudioManager.double_jump_sfx.emit()
 				visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
 				visuals.activate_trail()
 				air_jumps_left -= 1
@@ -205,10 +206,9 @@ func die():
 
 	_switch_state(State.HURT)
 
-	#_play_varied(hurt_sound)
+	AudioManager.hurt_sfx.emit()
 	visuals.spawn_burst(global_position + Vector2(0, -6), Color(1.0, 0.4, 0.4), 22, 150.0)
 	visuals.flash_screen(Color(0.7, 0.05, 0.05, 0.55), 0.5)   # red full-screen hit-flash
-	#Music.duck()                                            # drop + muffle the music
 	visuals.add_shake(7.0)
 	visuals.add_zoom_punch(0.18)
 	velocity = Vector2.ZERO
@@ -229,7 +229,7 @@ func _check_landing(fall_speed: float):
 	# Just touched down this frame.
 	if is_on_floor() and not was_on_floor:
 		var impact = max(fall_speed, 0.0)  # downward speed at the moment of impact
-	#	_play_varied(land_sound)
+		AudioManager.land_sfx.emit()
 		# Squish the player on impact — harder falls flatten more, but even a soft
 		# hop gets a clear squish. The spring then bounces it back through a stretch.
 		visuals.trigger_land_squash(impact)
@@ -244,7 +244,7 @@ func _check_landing(fall_speed: float):
 func bounce(amount: float = STOMP_BOUNCE):
 	velocity.y = amount
 	air_jumps_left = MAX_AIR_JUMPS
-	#_play_varied(stomp_sound)
+	AudioManager.stomp_sfx.emit()
 	visuals.add_shake(2.5)
 	visuals.add_zoom_punch(0.10)         # snappy push-in sells the stomp
 	visuals.activate_trail()             # streak off the bounce
@@ -274,9 +274,3 @@ func _corner_correction():
 			if not test_move(global_transform.translated(shift), motion):
 				global_position.x += dir * offset
 				return
-
-# Plays a sound with a little random pitch so repeated actions never sound
-# identical — the cheapest way to kill "repetition fatigue" in the SFX.
-func _play_varied(sound: AudioStreamPlayer, low := 0.92, high := 1.09):
-	sound.pitch_scale = randf_range(low, high)
-	sound.play()

@@ -1,0 +1,67 @@
+extends AudioStreamPlayer2D
+
+var sound_library = {
+	"hurt":
+		preload("uid://30n2qpcdvrsh"),
+	
+	"land":
+		preload("uid://i532dau6x02s"),
+	
+	"stomp": 
+		preload("uid://dy150vvuedwlo"),
+	
+	"jump": 
+		preload("uid://c7d6ku5bgcbqp"),
+
+	"double_jump": 
+		preload("uid://28pfqudomll3"),
+
+}
+
+signal hurt_sfx
+signal land_sfx
+signal stomp_sfx
+signal jump_sfx
+signal double_jump_sfx
+
+func _ready():
+	hurt_sfx.connect(_on_hurt)
+	land_sfx.connect(_on_land)
+	stomp_sfx.connect(_on_stomp)
+	jump_sfx.connect(_on_jump)
+	double_jump_sfx.connect(_on_double_jump)
+
+func _on_hurt() -> void:
+	play_sound("hurt")
+
+func _on_land() -> void:
+	play_sound("land")
+
+func _on_stomp() -> void:
+	play_sound("stomp")
+
+func _on_jump() -> void:
+	play_sound("jump")
+
+func _on_double_jump() -> void:
+	play_sound("double_jump")
+
+#doing too much - no need to randomize values for songs
+func play_sound(sound_name: StringName, low := 0.92, high := 1.09) -> void:
+	var audio_stream_to_play: AudioStream
+
+	if typeof(sound_library[sound_name]) == TYPE_ARRAY:
+		var sound_options: Array = sound_library[sound_name]
+		var random_index = randi() % sound_options.size()
+		audio_stream_to_play = sound_options[random_index]
+	else:
+		audio_stream_to_play = sound_library[sound_name]
+
+	if audio_stream_to_play:
+		var new_audio_player = AudioStreamPlayer2D.new()
+
+		new_audio_player.stream = audio_stream_to_play
+		add_child(new_audio_player)
+		new_audio_player.finished.connect(Callable(new_audio_player, "queue_free"))
+		new_audio_player.pitch_scale = randf_range(low, high)
+		new_audio_player.play()
