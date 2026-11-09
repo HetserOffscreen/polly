@@ -18,34 +18,6 @@ var sound_library = {
 
 }
 
-signal hurt_sfx
-signal land_sfx
-signal stomp_sfx
-signal jump_sfx
-signal double_jump_sfx
-
-func _ready():
-	hurt_sfx.connect(_on_hurt)
-	land_sfx.connect(_on_land)
-	stomp_sfx.connect(_on_stomp)
-	jump_sfx.connect(_on_jump)
-	double_jump_sfx.connect(_on_double_jump)
-
-func _on_hurt() -> void:
-	play_sound("hurt")
-
-func _on_land() -> void:
-	play_sound("land")
-
-func _on_stomp() -> void:
-	play_sound("stomp")
-
-func _on_jump() -> void:
-	play_sound("jump")
-
-func _on_double_jump() -> void:
-	play_sound("double_jump")
-
 #doing too much - no need to randomize values for songs
 func play_sound(sound_name: StringName, low := 0.92, high := 1.09) -> void:
 	var audio_stream_to_play: AudioStream
