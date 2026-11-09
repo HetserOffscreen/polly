@@ -67,8 +67,4 @@ debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
 [node name="Player" parent="." unique_id=1260122610 instance=ExtResource("2_843q2")]
 position = Vector2(217, 430)
 
-[node name="Camera2D" type="Camera2D" parent="Player" unique_id=1374289153]
-unique_name_in_owner = true
-zoom = Vector2(1.2, 1.2)
-
 [connection signal="body_entered" from="Scenario/Killzone" to="Scenario/Killzone" method="_on_body_entered"]

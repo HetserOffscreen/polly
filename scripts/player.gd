@@ -4,6 +4,7 @@ extends CharacterBody2D
 @onready var player_collision:	CollisionPolygon2D	= %CollisionShape
 @onready var dust_particles:	CPUParticles2D  	= %DustParticles
 @onready var camera: 			Camera2D           	= %Camera2D
+@onready var visuals:			Node				= %Visuals
 
 # --- Horizontal movement ---
 @export_group("Horizontal Movement")
@@ -36,51 +37,12 @@ const COYOTE_TIME: 				float			= 0.10
 const JUMP_BUFFER: 				float			= 0.10		
 const CORNER_CORRECTION_PIXELS: int	 			= 4			# value in Pixels
 
-# --- Camera feel ---
-var shake_strength:				float			= 0.0
-const SHAKE_DECAY:				float			= 28.0   	# higher = shake settles back faster
-
-# look ahead
-var look_ahead_x:				float			= 0.0
-const LOOK_AHEAD:				float			= 16.0  	# how far the camera leads, in pixels
-const LOOK_AHEAD_SPEED:			float			= 4.0   	# how quickly it eases to the lead position
-
-# Zoom "punch": a quick push-in on big impacts that springs back to normal.
-var base_zoom:					Vector2			= Vector2.ONE
-var zoom_punch:					float			= 0.0
-const ZOOM_PUNCH_DECAY:			float			= 5.0
-
-# --- Animation
-# --- Motion trail  ---
-var trail_timer:				float			= 0.0
-var afterimage_cooldown:		float			= 0.0
-const TRAIL_DURATION:			float		    = 0.35
-const AFTERIMAGE_INTERVAL:		float		 	= 0.05
-const TRAIL_COLOR: 				Color			= Color(0.6, 0.8, 1.0, 0.5)
-
-# --- Squash & stretch  ---
-const SQUASH_STIFFNESS:			float			= 360.0  # spring strength — higher = snappier recovery
-const SQUASH_DAMPING:			float			= 16.0   # higher = calmer; lower = more bounce/wobble
-const AIR_STRETCH_MAX:			float			= 0.10   # subtle tall-stretch that grows with air speed
-const SQUASH_PIVOT:				float			= 16.0   # keeps the feet planted while squashing
-const LAND_SQUASH_MIN:			float			= 0.14   # squash from the softest landing
-const LAND_SQUASH_MAX:			float			= 0.36   # squash from a full-speed slam
-const JUMP_STRETCH:				float			= 0.22   # stretch on take-off
-const BOUNCE_SQUASH:			float			= 0.28    
-
-# Squash & stretch spring state 
-var squash:						float			= 0.0		# squash > 0 = squashed
-var squash_vel:					float			= 0.0		# (wide & short), squash < 0 = stretched (tall & thin); it springs back to 0.
-var base_sprite_y:				float			= 0.0
-
-# --- Runtime state ---
+# --- Runtime state aand Flags ---
 var air_jumps_left:				int				= 0
 var coyote_timer:				float			= 0.0
 var jump_buffer_timer:			float			= 0.0
 var dust_cooldown:				float			= 0.0
 var was_on_floor:				bool			= false
-
-# --- Flags ---
 var is_dead:					bool			= false
 
 
@@ -93,11 +55,6 @@ func _ready() -> void:
 	# set body n collision
 	player_collision.polygon = player_body.polygon
 	player_body.color = Color.BLACK
-
-	if camera:
-		base_zoom = camera.zoom   # remember the resting zoom so punches settle back
-	base_sprite_y = player_body.position.y
-	_squash_impulse(BOUNCE_SQUASH) # the pop-in at level start
 
 
 func _physics_process(delta: float) -> void:
@@ -114,32 +71,6 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_check_landing(fall_speed)
 
-	_update_trail(delta)
-
-func _process(delta: float):
-	_update_squash(delta)   # drive the squash/stretch spring every frame
-
-	if camera == null:
-		return
-
-	# Look-ahead: ease the camera toward a lead offset in the move direction.
-	var target_lead := 0.0
-	if not is_dead and absf(velocity.x) > 20.0:
-		target_lead = signf(velocity.x) * LOOK_AHEAD
-	look_ahead_x = lerp(look_ahead_x, target_lead, 1.0 - exp(-LOOK_AHEAD_SPEED * delta))
-
-	# Decaying random shake, added on top of the look-ahead.
-	var shake_vec := Vector2.ZERO
-	if shake_strength > 0.0:
-		shake_strength = move_toward(shake_strength, 0.0, SHAKE_DECAY * delta)
-		shake_vec = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * shake_strength
-
-	camera.offset = Vector2(look_ahead_x, 0.0) + shake_vec
-
-	# Zoom punch: push in on impact, then spring back to the resting zoom.
-	if zoom_punch > 0.0:
-		zoom_punch = move_toward(zoom_punch, 0.0, ZOOM_PUNCH_DECAY * delta)
-	camera.zoom = base_zoom * (1.0 + zoom_punch)
 
 # Game Loop / State Triggers and Definitions
 func _process_state(delta: float) -> void:
@@ -170,6 +101,7 @@ func _process_state(delta: float) -> void:
 	match active_state:
 		State.IDLE:
 			_handle_horizontal_movement(delta)
+			
 			# Triggers
 			if direction != 0.0:
 				_switch_state(State.RUN)
@@ -184,7 +116,7 @@ func _process_state(delta: float) -> void:
 				dust_cooldown -= delta
 				if dust_cooldown <= 0.0:
 					dust_cooldown = 0.2
-					_spawn_dust(3)
+					visuals.spawn_dust(3)
 
 			# Triggers
 			if direction == 0.0:
@@ -198,11 +130,10 @@ func _process_state(delta: float) -> void:
 			# Air jump (Double Jump)
 			if jump_buffer_timer > 0.0 and air_jumps_left > 0:
 				_do_jump(DOUBLE_JUMP_VELOCITY)
-				Juice.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
-				trail_timer = TRAIL_DURATION
+				visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
+				visuals.activate_trail()
 				air_jumps_left -= 1
 				jump_buffer_timer = 0.0
-
 			# Variable jump height cut
 			if Input.is_action_just_released("jump") and velocity.y < 0.0:
 				velocity.y *= JUMP_CUT
@@ -210,8 +141,6 @@ func _process_state(delta: float) -> void:
 			# Trigger
 			if is_on_floor():
 				_switch_state(State.IDLE if direction == 0.0 else State.RUN)
-
-
 
 		State.HURT:
 			pass
@@ -266,20 +195,22 @@ func _handle_horizontal_movement(delta: float) -> void:
 
 func _do_jump(jump_force: float):
 	velocity.y = jump_force
-	_squash_impulse(-JUMP_STRETCH)   # stretch tall on take-off
-	_spawn_dust(6)
+	visuals.trigger_jump_stretch()   # stretch tall on take-off
+	visuals.spawn_dust(6)
 
 func die():
 	if is_dead:
 		return
 	is_dead = true
 
+	_switch_state(State.HURT)
+
 	#_play_varied(hurt_sound)
-	Juice.spawn_burst(global_position + Vector2(0, -6), Color(1.0, 0.4, 0.4), 22, 150.0)
-	Juice.flash_screen(Color(0.7, 0.05, 0.05, 0.55), 0.5)   # red full-screen hit-flash
+	visuals.spawn_burst(global_position + Vector2(0, -6), Color(1.0, 0.4, 0.4), 22, 150.0)
+	visuals.flash_screen(Color(0.7, 0.05, 0.05, 0.55), 0.5)   # red full-screen hit-flash
 	#Music.duck()                                            # drop + muffle the music
-	add_shake(7.0)
-	add_zoom_punch(0.18)
+	visuals.add_shake(7.0)
+	visuals.add_zoom_punch(0.18)
 	velocity = Vector2.ZERO
 	set_physics_process(false)
 	player_collision.set_deferred("disabled", true)
@@ -301,12 +232,11 @@ func _check_landing(fall_speed: float):
 	#	_play_varied(land_sound)
 		# Squish the player on impact — harder falls flatten more, but even a soft
 		# hop gets a clear squish. The spring then bounces it back through a stretch.
-		var squish = clamp(impact / 320.0, LAND_SQUASH_MIN, LAND_SQUASH_MAX)
-		_squash_impulse(squish)
-		_spawn_dust(clamp(int(impact / 35.0), 4, 14))
+		visuals.trigger_land_squash(impact)
+		visuals.spawn_dust(clamp(int(impact / 35.0), 4, 14))
 		# Only real falls shake the screen — a normal hop barely registers.
-		add_shake(clamp((impact - 120.0) / 220.0, 0.0, 2.0))
-		add_zoom_punch(clamp(impact / 1400.0, 0.0, 0.05))
+		visuals.add_shake(clamp((impact - 120.0) / 220.0, 0.0, 2.0))
+		visuals.add_zoom_punch(clamp(impact / 1400.0, 0.0, 0.05))
 
 # Called by an enemy when we land on its head: pop upward, refresh the air jump,
 # and pile on the feedback (a freeze-frame, a shake, a squash) to sell the hit.
@@ -315,61 +245,16 @@ func bounce(amount: float = STOMP_BOUNCE):
 	velocity.y = amount
 	air_jumps_left = MAX_AIR_JUMPS
 	#_play_varied(stomp_sound)
-	add_shake(2.5)
-	add_zoom_punch(0.10)         # snappy push-in sells the stomp
-	trail_timer = TRAIL_DURATION # streak off the bounce
-	_squash_impulse(BOUNCE_SQUASH)
-	Juice.hit_stop(0.07)
+	visuals.add_shake(2.5)
+	visuals.add_zoom_punch(0.10)         # snappy push-in sells the stomp
+	visuals.activate_trail()             # streak off the bounce
+	visuals.trigger_bounce_squash()
+	visuals.hit_stop(0.07)
 
 
 # ---------------------------------------------------------------------------
 #  HELPERS
 # ---------------------------------------------------------------------------
-
-# camera stuff
-func add_shake(amount: float):
-	shake_strength = max(shake_strength, amount)
-
-# A quick camera push-in that springs back (see _process). Bigger = punchier.
-func add_zoom_punch(amount: float):
-	zoom_punch = max(zoom_punch, amount)
-
-# While the trail timer is active, drop a fading ghost on a fixed cadence.
-func _update_trail(delta: float):
-	if trail_timer <= 0.0:
-		return
-	trail_timer -= delta
-	afterimage_cooldown -= delta
-	if afterimage_cooldown <= 0.0:
-		afterimage_cooldown = AFTERIMAGE_INTERVAL
-		_spawn_afterimage()
-
-# Snapshots the current sprite frame as a static ghost that fades out in place.
-func _spawn_afterimage():
-	var body_shape: PackedVector2Array = [Vector2(-20,-20),Vector2(20,-20),Vector2(20,20),Vector2(-20,20)]
-	if body_shape == null:
-		return
-	var ghost := Polygon2D.new()
-	ghost.polygon = body_shape
-	ghost.global_position = player_body.global_position
-	ghost.scale = player_body.scale
-	ghost.modulate = TRAIL_COLOR
-	ghost.z_index = -1   # behind the player (z_index 5)
-
-	var scene := get_tree().current_scene
-	if scene == null:
-		return
-	scene.add_child(ghost)
-
-	var tween := ghost.create_tween()
-	tween.tween_property(ghost, "modulate:a", 0.0, 0.25)
-	tween.tween_callback(ghost.queue_free)
-
-# Plays a sound with a little random pitch so repeated actions never sound
-# identical — the cheapest way to kill "repetition fatigue" in the SFX.
-func _play_varied(sound: AudioStreamPlayer, low := 0.92, high := 1.09):
-	sound.pitch_scale = randf_range(low, high)
-	sound.play()
 
 # Ceiling corner correction: while rising, if the head is blocked but a tiny
 # sideways nudge would clear the corner, take it. Turns cheap head-bonks into
@@ -390,24 +275,8 @@ func _corner_correction():
 				global_position.x += dir * offset
 				return
 
-func _spawn_dust(amount: int):
-	dust_particles.amount = max(1, amount)
-	dust_particles.color = Color.BEIGE
-	dust_particles.restart()
-
-func _squash_impulse(amount: float):
-	squash = amount
-	squash_vel = 0.0
-
-func _update_squash(delta: float):
-	if player_body == null:
-		return
-	var d = minf(delta, 0.033)   # guard the spring against frame-time spikes
-	var rest := 0.0
-	if not is_on_floor() and not is_dead:
-		rest = -clampf(absf(velocity.y) / 650.0, 0.0, AIR_STRETCH_MAX)
-	var force = -SQUASH_STIFFNESS * (squash - rest) - SQUASH_DAMPING * squash_vel
-	squash_vel += force * d
-	squash += squash_vel * d
-	player_body.scale = Vector2(1.0 + squash, 1.0 - squash)
-	player_body.position.y = base_sprite_y + SQUASH_PIVOT * squash
+# Plays a sound with a little random pitch so repeated actions never sound
+# identical — the cheapest way to kill "repetition fatigue" in the SFX.
+func _play_varied(sound: AudioStreamPlayer, low := 0.92, high := 1.09):
+	sound.pitch_scale = randf_range(low, high)
+	sound.play()

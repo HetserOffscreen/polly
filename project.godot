@@ -14,10 +14,6 @@ config/name="Polly"
 run/main_scene="uid://piijqd14i7tq"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
-[autoload]
-
-Juice="*res://scripts/juice.gd"
-
 [display]
 
 window/stretch/mode="canvas_items"

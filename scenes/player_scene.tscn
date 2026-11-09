@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://1jb22rygluat"]
 
 [ext_resource type="Script" uid="uid://bvli2sbutv2nl" path="res://scripts/player.gd" id="1_crmta"]
+[ext_resource type="Script" uid="uid://c6qnyum3ompa1" path="res://scripts/player_visuals.gd" id="2_vefth"]
 
 [sub_resource type="CanvasTexture" id="CanvasTexture_crmta"]
 
@@ -25,6 +26,17 @@ polygon = PackedVector2Array(-20, -20, 20, -20, 20, 20, -20, 20)
 [node name="CollisionShape" type="CollisionPolygon2D" parent="." unique_id=312490499]
 unique_name_in_owner = true
 visible = false
+
+[node name="Visuals" type="Node2D" parent="." unique_id=1334699857 node_paths=PackedStringArray("camera", "player_body", "dust_particles")]
+unique_name_in_owner = true
+script = ExtResource("2_vefth")
+camera = NodePath("../Camera2D")
+player_body = NodePath("../Body")
+dust_particles = NodePath("../DustParticles")
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=328999430]
+unique_name_in_owner = true
+zoom = Vector2(1.2, 1.2)
 
 [node name="PointLight2D" type="PointLight2D" parent="." unique_id=1607022104]
 z_index = -1
