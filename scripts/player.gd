@@ -79,15 +79,20 @@ var coyote_timer:				float			= 0.0
 var jump_buffer_timer:			float			= 0.0
 var dust_cooldown:				float			= 0.0
 var was_on_floor:				bool			= false
+
+# --- Flags ---
 var is_dead:					bool			= false
 
+
+enum State {IDLE, RUN, AIR, DASH, HURT}
+var active_state: State = State.IDLE
 
 func _ready() -> void:
 	add_to_group("player")	# use get_tree().get_first_node_in_group("player") to track the player
 	
 	# set body n collision
 	player_collision.polygon = player_body.polygon
-	player_body.color = Color.WHITE
+	player_body.color = Color.BLACK
 
 	if camera:
 		base_zoom = camera.zoom   # remember the resting zoom so punches settle back
@@ -100,19 +105,18 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_apply_gravity(delta)
-	_handle_jump(delta)
-	_handle_horizontal_movement(delta)
+	_process_state(delta)
 	_corner_correction()
-	_update_trail(delta)
-
-	# Remember floor state + fall speed, run, then react to having just landed.
-	# (move_and_slide zeroes velocity.y on impact, so we must read it first.)
+	
+	# Capture velocity, execute slide, and check impact
 	was_on_floor = is_on_floor()
 	var fall_speed = velocity.y
 	move_and_slide()
 	_check_landing(fall_speed)
 
-func _process(delta):
+	_update_trail(delta)
+
+func _process(delta: float):
 	_update_squash(delta)   # drive the squash/stretch spring every frame
 
 	if camera == null:
@@ -137,20 +141,11 @@ func _process(delta):
 		zoom_punch = move_toward(zoom_punch, 0.0, ZOOM_PUNCH_DECAY * delta)
 	camera.zoom = base_zoom * (1.0 + zoom_punch)
 
-# ---------------------------------------------------------------------------
-#  MOVEMENT
-# ---------------------------------------------------------------------------
-func _apply_gravity(delta):
-	if not is_on_floor():
-		# Heavier gravity while falling than while rising = a satisfying arc.
-		var mult := RISE_GRAVITY_MULT if velocity.y < 0.0 else FALL_GRAVITY_MULT
-		# Apex hang: ease gravity right at the top of the arc for a beat of float.
-		if absf(velocity.y) < APEX_SPEED_THRESHOLD:
-			mult *= APEX_GRAVITY_MULT             # ease off at the top of the arc
-		velocity.y += BASE_GRAVITY * mult * delta
-		velocity.y = min(velocity.y, MAX_FALL_SPEED)
+# Game Loop / State Triggers and Definitions
+func _process_state(delta: float) -> void:
+	var direction := Input.get_axis("move_left", "move_right")
 
-func _handle_jump(delta):
+	# Update timers globally for ground states
 	if is_on_floor():
 		coyote_timer = COYOTE_TIME
 		air_jumps_left = MAX_AIR_JUMPS
@@ -161,30 +156,103 @@ func _handle_jump(delta):
 		jump_buffer_timer = JUMP_BUFFER
 	else:
 		jump_buffer_timer = max(jump_buffer_timer - delta, 0.0)
-
-	# A buffered press + coyote grace = a ground jump.
-	if jump_buffer_timer > 0.0 and coyote_timer > 0.0:
+	
+	# 2. Universal Ground Jump
+	if active_state != State.AIR and jump_buffer_timer > 0.0 and coyote_timer > 0.0:
 		_do_jump(JUMP_VELOCITY)
-		#_play_varied(jump_sound)
 		jump_buffer_timer = 0.0
 		coyote_timer = 0.0
-	# Otherwise spend an air jump (double jump) with its own pop of feedback.
-	elif jump_buffer_timer > 0.0 and air_jumps_left > 0:
-		_do_jump(DOUBLE_JUMP_VELOCITY)
-		#_play_varied(double_jump_sound)
-		Juice.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
-		trail_timer = TRAIL_DURATION   # streak out of the double jump
-		air_jumps_left -= 1
-		jump_buffer_timer = 0.0
+		_switch_state(State.AIR)
+		return
+	
+	
+	# State Behavior & Transitions
+	match active_state:
+		State.IDLE:
+			_handle_horizontal_movement(delta)
+			# Triggers
+			if direction != 0.0:
+				_switch_state(State.RUN)
+			elif not is_on_floor():
+				_switch_state(State.AIR)
 
-	# Variable jump height
-	if Input.is_action_just_released("jump") and velocity.y < 0.0:
-		velocity.y *= JUMP_CUT
+		State.RUN:
+			_handle_horizontal_movement(delta)
 
-func _do_jump(jump_force: float):
-	velocity.y = jump_force
-	_squash_impulse(-JUMP_STRETCH)   # stretch tall on take-off
-	_spawn_dust(6)
+			# Dust Animation
+			if is_on_floor() and abs(velocity.x) > 40.0:
+				dust_cooldown -= delta
+				if dust_cooldown <= 0.0:
+					dust_cooldown = 0.2
+					_spawn_dust(3)
+
+			# Triggers
+			if direction == 0.0:
+				_switch_state(State.IDLE)
+			elif not is_on_floor():
+				_switch_state(State.AIR)
+
+		State.AIR:
+			_handle_horizontal_movement(delta)
+
+			# Air jump (Double Jump)
+			if jump_buffer_timer > 0.0 and air_jumps_left > 0:
+				_do_jump(DOUBLE_JUMP_VELOCITY)
+				Juice.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
+				trail_timer = TRAIL_DURATION
+				air_jumps_left -= 1
+				jump_buffer_timer = 0.0
+
+			# Variable jump height cut
+			if Input.is_action_just_released("jump") and velocity.y < 0.0:
+				velocity.y *= JUMP_CUT
+
+			# Trigger
+			if is_on_floor():
+				_switch_state(State.IDLE if direction == 0.0 else State.RUN)
+
+
+
+		State.HURT:
+			pass
+
+
+
+#  One Time Operations / Transitions
+func _switch_state(to_state: State) -> void:
+	if to_state == active_state:
+		return
+
+	match active_state:
+		State.IDLE:
+			pass
+
+		State.RUN:
+			pass
+
+		State.AIR:
+			pass
+
+		State.HURT:
+			pass
+
+	active_state = to_state
+
+
+# ---------------------------------------------------------------------------
+#  MOVEMENT
+# ---------------------------------------------------------------------------
+func _apply_gravity(delta):
+	if not is_on_floor():
+		# Heavier gravity while falling than while rising = a satisfying arc.
+		var mult := RISE_GRAVITY_MULT if velocity.y < 0.0 else FALL_GRAVITY_MULT
+
+		# Apex hang: ease gravity right at the top of the arc for a beat of float.
+		if absf(velocity.y) < APEX_SPEED_THRESHOLD:
+			mult *= APEX_GRAVITY_MULT             # ease off at the top of the arc
+		velocity.y += BASE_GRAVITY * mult * delta
+		velocity.y = min(velocity.y, MAX_FALL_SPEED)
+
 
 func _handle_horizontal_movement(delta: float) -> void:
 	var direction := Input.get_axis("move_left", "move_right")
@@ -195,12 +263,11 @@ func _handle_horizontal_movement(delta: float) -> void:
 		var fric := FLOOR_FRICTION if is_on_floor() else AIR_FRICTION
 		velocity.x = move_toward(velocity.x, 0.0, fric * delta)
 
-	# Kick up dust while running on the ground.
-	if is_on_floor() and abs(velocity.x) > 40.0:
-		dust_cooldown -= delta
-		if dust_cooldown <= 0.0:
-			dust_cooldown = 0.2
-			_spawn_dust(3)
+
+func _do_jump(jump_force: float):
+	velocity.y = jump_force
+	_squash_impulse(-JUMP_STRETCH)   # stretch tall on take-off
+	_spawn_dust(6)
 
 func die():
 	if is_dead:
@@ -222,6 +289,7 @@ func die():
 	await get_tree().create_timer(0.8, true, false, true).timeout
 	Engine.time_scale = 1.0
 	get_tree().reload_current_scene()
+
 
 # ---------------------------------------------------------------------------
 #  LANDING & STOMPING
@@ -251,7 +319,8 @@ func bounce(amount: float = STOMP_BOUNCE):
 	add_zoom_punch(0.10)         # snappy push-in sells the stomp
 	trail_timer = TRAIL_DURATION # streak off the bounce
 	_squash_impulse(BOUNCE_SQUASH)
-	Juice.hit_stop(0.07)   
+	Juice.hit_stop(0.07)
+
 
 # ---------------------------------------------------------------------------
 #  HELPERS

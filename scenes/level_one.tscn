@@ -53,13 +53,13 @@ shape = SubResource("RectangleShape2D_t18mc")
 debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
 
 [node name="CollisionShape2D2" type="CollisionShape2D" parent="Scenario/Walls" unique_id=778935523]
-position = Vector2(363, -380)
+position = Vector2(1049, -380)
 rotation = 1.5707964
 shape = SubResource("RectangleShape2D_glv2v")
 debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
 
 [node name="CollisionShape2D3" type="CollisionShape2D" parent="Scenario/Walls" unique_id=1069837383]
-position = Vector2(590, -198.75)
+position = Vector2(1276, -198.75)
 rotation = 1.5707964
 shape = SubResource("RectangleShape2D_glv2v")
 debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)

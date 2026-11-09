@@ -26,6 +26,8 @@ window/stretch/aspect="expand"
 [file_customization]
 
 folder_colors={
+"res://assets/": "red",
+"res://components/": "orange",
 "res://scripts/": "blue"
 }
 
