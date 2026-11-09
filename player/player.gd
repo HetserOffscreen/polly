@@ -24,14 +24,17 @@ var active_state:= State.IDLE
 @export var JUMP_CUT: 			float	= 0.45
 @export var STOMP_BOUNCE: 		float	= -260.0
 @export var MAX_FALL_SPEED: 	float	= 900.0
-@export var MAX_AIR_JUMPS: 		int  	= 2
+@export var MAX_AIR_JUMPS: 		int  	= 1
 
 # --- Dashing ---
 @export_group("Dashing")
 @export var dash_timer:			float	= 0.0
+@export var dash_cooldown_timer:float	= 0.0
 @export var dash_direction:		float	= 1.0
-const DASH_SPEED:				float	= 600.0
-const DASH_DURATION:			float	= 0.2
+@export var DASH_SPEED:			float	= 600.0
+@export var DASH_DURATION:		float	= 0.2
+const DASH_COOLDOWN:			float	= 0.4	# Time between dashes
+var can_dash:					bool	= true
 
 # --- Wall Movement ---
 @export_group("Wall Movement")
@@ -192,21 +195,32 @@ func _update_air(_delta: float, direction: float) -> void:
 
 func _update_dash(delta: float, direction: float) -> void:
 	velocity.x = dash_direction * DASH_SPEED
+	velocity.y = 0.0
 	dash_timer -= delta
 	
 	# Trigger
 	if dash_timer <= 0.0:
+		# Snip excess speed upon exiting dash so movement remains precise
+		velocity.x = dash_direction * minf(absf(velocity.x), FLOOR_MAX_SPEED * 1.1)
+
 		if direction != 0.0:
 			_switch_state(State.RUN)
 		else:
 			_switch_state(State.IDLE)
 
+#we can improve this mess
 func _handle_global_inputs(delta: float) -> bool:
 	# Handle timers, jump buffering, and global triggers (Jump/Dash)
+
+	# Unconditional timers & cooldowns (must run every frame)
+	if dash_cooldown_timer > 0.0:
+		dash_cooldown_timer = max(dash_cooldown_timer - delta, 0.0)
+
 	# Update timers globally for ground states
-	if is_on_floor():
+	if is_on_floor() or is_on_wall():
 		coyote_timer = COYOTE_TIME
 		air_jumps_left = MAX_AIR_JUMPS
+		can_dash = true
 	else:
 		coyote_timer = max(coyote_timer - delta, 0.0)
 
@@ -215,8 +229,8 @@ func _handle_global_inputs(delta: float) -> bool:
 	else:
 		jump_buffer_timer = max(jump_buffer_timer - delta, 0.0)
 	
-	# Universal Ground Jump
-	if active_state != State.AIR and jump_buffer_timer > 0.0 and coyote_timer > 0.0:
+	# Universal Ground Jump (Ignored if currently touching a wall)
+	if active_state != State.AIR and jump_buffer_timer > 0.0 and coyote_timer > 0.0 and not is_on_wall(): #maybe there is room for improvement here
 		_execute_jump(JUMP_HEIGHT)
 		jump_buffer_timer = 0.0
 		coyote_timer = 0.0
@@ -234,7 +248,7 @@ func _handle_global_inputs(delta: float) -> bool:
 	if active_state != State.DASH and Input.is_action_just_pressed("dash"):
 		_execute_dash()
 		return true
-	
+
 	return false
 
 func _execute_wall_jump() -> void:
@@ -260,7 +274,7 @@ func _update_wall_slide(delta: float, direction: float) -> void:
 		velocity.y = min(velocity.y, WALL_SLIDE_SPEED)
 	
 	# Allow minor horizontal pushing against the wall or jumping off
-	velocity.x = current_wall_normal_x * 10.0 # Pins player softly to wall
+	velocity.x = 0.0
 
 	# Transition Triggers
 	if is_on_floor():
@@ -310,7 +324,13 @@ func _execute_jump(jump_force: float):
 	visuals.spawn_dust(6)
 
 func _execute_dash() -> void:
-	if active_state == State.WALL_SLIDE or (not is_on_floor() and is_on_wall()):
+	if not can_dash or dash_cooldown_timer > 0.0:
+		return
+
+	can_dash = false
+	dash_cooldown_timer = DASH_COOLDOWN
+
+	if active_state == State.WALL_SLIDE or wall_coyote_timer > 0.0:
 		dash_direction = current_wall_normal_x
 
 	AudioManager.play_sound("dash")

@@ -66,5 +66,7 @@ debug_color = Color(0.72147495, 0.30533206, 0.91872007, 0.41960785)
 
 [node name="Player" parent="." unique_id=1260122610 instance=ExtResource("2_foyw7")]
 position = Vector2(217, 430)
+DASH_SPEED = 750.0
+DASH_DURATION = 0.12
 
 [connection signal="body_entered" from="Scenario/Killzone" to="Scenario/Killzone" method="_on_body_entered"]
