@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://piijqd14i7tq"]
 
-[ext_resource type="Script" uid="uid://cslsw6uc02okp" path="res://scripts/killzone.gd" id="1_t18mc"]
-[ext_resource type="PackedScene" uid="uid://1jb22rygluat" path="res://scenes/player_scene.tscn" id="2_843q2"]
+[ext_resource type="Script" uid="uid://cslsw6uc02okp" path="res://components/killzone.gd" id="1_t18mc"]
+[ext_resource type="PackedScene" uid="uid://1jb22rygluat" path="res://components/player/player_scene.tscn" id="2_843q2"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_jrljy"]
 size = Vector2(308, 110)
