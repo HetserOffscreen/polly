@@ -135,6 +135,9 @@ func _squash_impulse(amount: float) -> void:
 func trigger_jump_stretch() -> void:
 	_squash_impulse(-JUMP_STRETCH)
 
+func trigger_wall_squash() -> void:
+	_squash_impulse(-0.18) # Negative value = stretched tall / compressed against the wall
+
 func trigger_land_squash(impact: float) -> void:
 	var squish = clamp(impact / 320.0, LAND_SQUASH_MIN, LAND_SQUASH_MAX)
 	_squash_impulse(squish)

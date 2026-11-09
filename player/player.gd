@@ -1,6 +1,6 @@
 extends CharacterBody2D
 
-enum State {IDLE, RUN, AIR, DASH}
+enum State {IDLE, RUN, AIR, DASH, WALL_SLIDE}
 var active_state:= State.IDLE
 
 @onready var player_body:		Polygon2D			= %Body
@@ -33,6 +33,19 @@ var active_state:= State.IDLE
 const DASH_SPEED:				float	= 600.0
 const DASH_DURATION:			float	= 0.2
 
+# --- Wall Movement ---
+@export_group("Wall Movement")
+@export var WALL_SLIDE_SPEED: 	float	= 120.0
+@export var WALL_HANG_DURATION: float	= 0.12     # Hold momentarily before sliding
+@export var WALL_JUMP_FORCE:	Vector2	= Vector2(420.0, -420.0) # X = push out, Y = upward lift
+const WALL_COYOTE_TIME: 		float	= 0.15
+const WALL_JUMP_LOCK_TIME: 		float	= 0.15
+
+var wall_coyote_timer: 			float	= 0.0
+var wall_jump_lock_timer: 		float	= 0.0
+var wall_hang_timer:			float	= 0.0
+var current_wall_normal_x:		float	= 0.0
+
 # --- Gravity feel ---
 @export_group("Gravity feel")
 const RISE_GRAVITY_MULT: 		float	= 0.9		# a little floaty on the way up
@@ -64,20 +77,33 @@ func _physics_process(delta: float) -> void:
 	if is_dead:
 		return
 
-	_apply_gravity(delta)
-	_process_state(delta)
-	_corner_correction()
-	
+	# Resolve collisions and update wall/floor sensors FIRST
 	# Capture velocity, execute slide, and check impact
 	was_on_floor = is_on_floor()
 	var fall_speed = velocity.y
 	move_and_slide()
+	_update_wall_tracking(delta) # Post-Slide Wall Tracking (Zero Frame Lag)
 	_check_landing(fall_speed)
+	
+	# Apply forces and process states using FRESH sensor data
+	_apply_gravity(delta)
+	_process_state(delta)
+	_corner_correction()
 
 	#print(State.find_key(active_state))
 
+func _update_wall_tracking(delta: float) -> void:
+	if wall_jump_lock_timer > 0.0:
+		wall_jump_lock_timer = max(wall_jump_lock_timer - delta, 0.0)
+
+	if not is_on_floor() and is_on_wall():
+		wall_coyote_timer = WALL_COYOTE_TIME
+		current_wall_normal_x = get_wall_normal().x
+	else:
+		wall_coyote_timer = max(wall_coyote_timer - delta, 0.0)
+
 # ---------------------------------------------------------------------------
-#  STATE MACHINE
+#  FINITE STATE MACHINE
 # ---------------------------------------------------------------------------
 func _process_state(delta: float) -> void:
 	var direction := Input.get_axis("move_left", "move_right")
@@ -95,6 +121,7 @@ func _process_state(delta: float) -> void:
 		State.RUN:	_update_run(delta, direction)
 		State.AIR:	_update_air(delta, direction)
 		State.DASH:	_update_dash(delta, direction)
+		State.WALL_SLIDE: _update_wall_slide(delta, direction)
 
 func _switch_state(new_state: State) -> void:
 	if new_state == active_state:
@@ -113,6 +140,10 @@ func _switch_state(new_state: State) -> void:
 
 		State.DASH:
 			dash_timer = DASH_DURATION
+
+		State.WALL_SLIDE:
+			wall_hang_timer = WALL_HANG_DURATION
+			visuals.trigger_wall_squash()
 
 	active_state = new_state
 
@@ -138,9 +169,15 @@ func _update_run(delta: float, direction: float) -> void:
 		_switch_state(State.AIR)
 
 func _update_air(_delta: float, direction: float) -> void:
+	# Check for wall slide entry: falling down, touching a wall, pushing towards it
+	if velocity.y > 0.0 and is_on_wall():
+		if direction != 0.0 and sign(direction) == -get_wall_normal().x:
+			_switch_state(State.WALL_SLIDE)
+			return
+
 	# Air jump (Double Jump)
 	if jump_buffer_timer > 0.0 and air_jumps_left > 0:
-		_jump(DOUBLE_JUMP_HEIGHT)
+		_execute_jump(DOUBLE_JUMP_HEIGHT)
 		visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
 		visuals.activate_trail()
 		air_jumps_left -= 1
@@ -180,23 +217,67 @@ func _handle_global_inputs(delta: float) -> bool:
 	
 	# Universal Ground Jump
 	if active_state != State.AIR and jump_buffer_timer > 0.0 and coyote_timer > 0.0:
-		_jump(JUMP_HEIGHT)
+		_execute_jump(JUMP_HEIGHT)
 		jump_buffer_timer = 0.0
 		coyote_timer = 0.0
 		_switch_state(State.AIR)
 		return true
-	
+
+	# Wall Jump (Triggers from Air or Wall Slide if coyote window is active)
+	if jump_buffer_timer > 0.0 and wall_coyote_timer > 0.0 and active_state != State.DASH:
+		_execute_wall_jump()
+		jump_buffer_timer = 0.0
+		wall_coyote_timer = 0.0
+		return true
+
 	# Dash Input Check
 	if active_state != State.DASH and Input.is_action_just_pressed("dash"):
-		_dash()
+		_execute_dash()
 		return true
 	
 	return false
+
+func _execute_wall_jump() -> void:
+	# Push away from the wall normal (e.g., if wall is on the left, normal.x is 1, push right)
+	var push_dir := current_wall_normal_x
+	velocity.x = push_dir * WALL_JUMP_FORCE.x
+	velocity.y = WALL_JUMP_FORCE.y
+	
+	wall_jump_lock_timer = WALL_JUMP_LOCK_TIME
+	air_jumps_left = MAX_AIR_JUMPS # Refresh double jumps on wall jump!
+	
+	AudioManager.play_sound("jump")
+	visuals.trigger_jump_stretch()
+	visuals.spawn_dust(6)
+	_switch_state(State.AIR)
+
+func _update_wall_slide(delta: float, direction: float) -> void:
+	# Cap fall speed to a slow, smooth slide
+	if wall_hang_timer > 0.0:
+		wall_hang_timer -= delta # Decrements the hang timer
+		velocity.y = 0.0
+	else:
+		velocity.y = min(velocity.y, WALL_SLIDE_SPEED)
+	
+	# Allow minor horizontal pushing against the wall or jumping off
+	velocity.x = current_wall_normal_x * 10.0 # Pins player softly to wall
+
+	# Transition Triggers
+	if is_on_floor():
+		_switch_state(State.IDLE if direction == 0.0 else State.RUN)
+	elif not is_on_wall():
+		_switch_state(State.AIR)
+	elif direction != 0.0 and sign(direction) != current_wall_normal_x:
+		# Pushing away from the wall releases the slide
+		_switch_state(State.AIR)
 
 # ---------------------------------------------------------------------------
 #  MOVEMENT
 # ---------------------------------------------------------------------------
 func _apply_gravity(delta):
+	if active_state == State.DASH:
+		return # <--- Dashes stay perfectly crisp without gravity interference
+		
 	if not is_on_floor():
 		# Heavier gravity while falling than while rising = a satisfying arc.
 		var mult := RISE_GRAVITY_MULT if velocity.y < 0.0 else FALL_GRAVITY_MULT
@@ -212,18 +293,26 @@ func _handle_horizontal_movement(delta: float, direction) -> void:
 	if direction != 0.0:
 		dash_direction = direction # Continuously remember the last direction moved/faced
 		var accel := FLOOR_ACCELERATION if is_on_floor() else AIR_ACCELERATION
+		
+		# If locked out from a wall jump, dampen steering weight temporarily
+		if wall_jump_lock_timer > 0.0:
+			accel *= 0.35
+		
 		velocity.x = move_toward(velocity.x, direction * FLOOR_MAX_SPEED, accel * delta)
 	else:
 		var fric := FLOOR_FRICTION if is_on_floor() else AIR_FRICTION
 		velocity.x = move_toward(velocity.x, 0.0, fric * delta)
 
-func _jump(jump_force: float):
+func _execute_jump(jump_force: float):
 	AudioManager.play_sound("jump")
 	velocity.y = jump_force
 	visuals.trigger_jump_stretch()   # stretch tall on take-off
 	visuals.spawn_dust(6)
 
-func _dash() -> void:
+func _execute_dash() -> void:
+	if active_state == State.WALL_SLIDE or (not is_on_floor() and is_on_wall()):
+		dash_direction = current_wall_normal_x
+
 	AudioManager.play_sound("dash")
 	visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
 	visuals.activate_trail()
