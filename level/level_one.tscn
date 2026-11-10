@@ -6,11 +6,8 @@
 
 [sub_resource type="FontVariation" id="FontVariation_bxc86"]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_jrljy"]
-size = Vector2(308, 110)
-
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_u1bno"]
-size = Vector2(7884, 110)
+size = Vector2(5801, 109)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_5klxn"]
 size = Vector2(2925, 105)
@@ -51,13 +48,8 @@ position = Vector2(119, 650)
 collision_layer = 2
 script = ExtResource("1_bo08i")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Scenario/Killzone" unique_id=728989687]
-position = Vector2(1, 16)
-shape = SubResource("RectangleShape2D_jrljy")
-debug_color = Color(0.9799214, 0, 0.3879387, 0.41960785)
-
 [node name="CollisionShape2D2" type="CollisionShape2D" parent="Scenario/Killzone" unique_id=1122986338]
-position = Vector2(1118, 231)
+position = Vector2(2159.5, 14.5)
 shape = SubResource("RectangleShape2D_u1bno")
 debug_color = Color(0.9799214, 0, 0.3879387, 0.41960785)
 
@@ -125,7 +117,5 @@ position = Vector2(472, 345)
 
 [node name="Player" parent="." unique_id=1260122610 instance=ExtResource("2_foyw7")]
 position = Vector2(217, 430)
-DASH_SPEED = 750.0
-DASH_DURATION = 0.12
 
 [connection signal="body_entered" from="Scenario/Killzone" to="Scenario/Killzone" method="_on_body_entered"]

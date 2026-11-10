@@ -9,35 +9,34 @@ enum State {IDLE, RUN, AIR, DASH, WALL}
 @onready var visuals:			Node2D				= %Visuals
 
 @export_group("Horizontal Movement")
-@export var FLOOR_MAX_SPEED: 	float	= 500.0
-@export var FLOOR_ACCELERATION:	float	= 1300.0
-@export var FLOOR_FRICTION:		float	= 3000.0
-@export var AIR_ACCELERATION:	float	= 900.0		# weaker steering in the air...
-@export var AIR_FRICTION:		float	= 300.0   	# longer momentum
-const RUN_DUST_THRESHOLD:		float	= 40.0
+const FLOOR_MAX_SPEED: 			float	= 500.0
+const FLOOR_ACCELERATION:		float	= 1300.0
+const FLOOR_FRICTION:			float	= 3000.0
+const AIR_ACCELERATION:			float	= 900.0		# weaker steering in the air...
+const AIR_FRICTION:				float	= 300.0   	# longer momentum
 const TURN_ACCELERATION:		float	= 2.5
+const RUN_DUST_THRESHOLD:		float	= 40.0
 
 @export_group("Jumping")
-@export var JUMP_HEIGHT: 		float	= -450.0	# max height
-@export var DOUBLE_JUMP_HEIGHT: float	= -300.0  	# a bit weaker
-@export var JUMP_CUT: 			float	= 0.45
-@export var STOMP_BOUNCE: 		float	= -260.0
-@export var MAX_FALL_SPEED: 	float	= 900.0
-@export var MAX_AIR_JUMPS: 		int  	= 1
+const JUMP_VELOCITY: 			float	= -450.0	# max height
+const DOUBLE_JUMP_VELOCITY:		float	= -300.0  	# a bit weaker
+var MAX_AIR_JUMPS:				int  	= 1			# default is zero
+var STOMP_BOUNCE: 				float	= -260.0
+const MAX_FALL_SPEED: 			float	= 900.0
+const JUMP_CUT:					float	= 0.12
+
+@export_group("Landing & Juice")
 const LAND_DUST_IMPACT_SCALE:	float	= 35.0
 const LAND_SHAKE_MIN_IMPACT:	float	= 120.0		#threshold
 const LAND_SHAKE_DIVISOR:		float	= 220.0
 const LAND_ZOOM_DIVISOR:		float	= 1400.0
 
 @export_group("Dashing")
-@export var dash_timer:			float	= 0.0
-@export var dash_cooldown_timer:float	= 0.0
-@export var dash_direction:		float	= 1.0
 @export var DASH_SPEED:			float	= 750.0
 @export var DASH_DURATION:		float	= 0.12
-var can_dash:					bool	= true
 const DASH_COOLDOWN:			float	= 0.		# Time between dashes
 const DASH_EXIT_SPEED_MULT:		float	= 1.1
+
 
 @export_group("Wall Movement")
 @export var WALL_SLIDE_SPEED: 	float	= 350.0
@@ -47,31 +46,40 @@ const WALL_COYOTE_TIME: 		float	= 0.15
 const WALL_JUMP_LOCK_TIME: 		float	= 0.15
 const WALL_JUMP_STEERING_MULT:	float	= 0.35
 
-var wall_coyote_timer: 			float	= 0.0
-var wall_jump_lock_timer: 		float	= 0.0
-var wall_hang_timer:			float	= 0.0
-var current_wall_normal_x:		float	= 0.0
-
 @export_group("Gravity Feel")
-@export var RISE_GRAVITY_MULT: 		float	= 0.9		# a little floaty on the way up
-@export var FALL_GRAVITY_MULT:		float	= 3.0		# snappier on the way down
-@export var APEX_SPEED_THRESHOLD:	float	= 45.0		# |vertical speed| under this = "near the apex"
-@export var APEX_GRAVITY_MULT: 		float	= 0.55		# extra-light gravity inside the hang window
-@export var BASE_GRAVITY:			float	= 980.0		# value in px/s²
+const RISE_GRAVITY_MULT: 		float	= 0.9		# a little floaty on the way up
+const FALL_GRAVITY_MULT:		float	= 3.0		# snappier on the way down
+const APEX_SPEED_THRESHOLD:		float	= 45.0		# |vertical speed| under this = "near the apex"
+const APEX_GRAVITY_MULT: 		float	= 0.55		# extra-light gravity inside the hang window
+const BASE_GRAVITY:				float	= 980.0		# value in px/s²
 
 @export_group("Forgiveness Windows")
 const COYOTE_TIME: 				float	= 0.10		# value in seconds
 const JUMP_BUFFER: 				float	= 0.10		# value in seconds
 const CORNER_CORRECTION_PIXELS: int	 	= 4			# value in Pixels
 
-@export_group("Runtime state and Flags")
-var active_state:		State	= State.IDLE
+@export_group("Runtime State and Flags")
+# Core
+var active_state:				State	= State.IDLE
+var was_on_floor:				bool	= false
+var is_dead:					bool	= false
+# Jump
 var air_jumps_left:				int		= 0
 var coyote_timer:				float	= 0.0
 var jump_buffer_timer:			float	= 0.0
 var dust_cooldown:				float	= 0.0
-var was_on_floor:				bool	= false
-var is_dead:					bool	= false
+# Wall
+var wall_coyote_timer: 			float	= 0.0
+var wall_jump_lock_timer: 		float	= 0.0
+var wall_hang_timer:			float	= 0.0
+var current_wall_normal_x:		float	= 0.0
+# Dash
+var can_dash:					bool	= true
+var dash_timer:					float	= 0.0
+var dash_cooldown_timer:		float	= 0.0
+var dash_direction:				float	= 1.0
+
+
 
 # ---------------------------------------------------------------------------
 #  Main Loop
@@ -173,7 +181,7 @@ func _handle_global_inputs(delta: float) -> State:
 	
 	# Universal Ground Jump
 	if active_state != State.AIR and jump_buffer_timer > 0.0 and coyote_timer > 0.0 and not is_on_wall(): #maybe room for improvement on this line?
-		_execute_jump(JUMP_HEIGHT)
+		_execute_jump(JUMP_VELOCITY)
 		jump_buffer_timer = 0.0
 		coyote_timer = 0.0
 		return State.AIR
@@ -219,7 +227,7 @@ func _update_air(_delta: float, direction: float) -> void:
 
 	# Air jump (Double Jump)
 	if jump_buffer_timer > 0.0 and air_jumps_left > 0:
-		_execute_jump(DOUBLE_JUMP_HEIGHT)
+		_execute_jump(DOUBLE_JUMP_VELOCITY)
 		visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
 		visuals.activate_trail()
 		air_jumps_left -= 1
