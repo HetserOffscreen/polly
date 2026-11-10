@@ -15,6 +15,7 @@ enum State {IDLE, RUN, AIR, DASH, WALL}
 @export var FLOOR_FRICTION:		float	= 1800.0
 @export var AIR_ACCELERATION:	float	= 900.0		# weaker steering in the air...
 @export var AIR_FRICTION:		float	= 300.0   	# longer momentum
+const RUN_DUST_THRESHOLD:		float	= 40.0
 
 # --- Jumping ---
 @export_group("Jumping")
@@ -24,6 +25,11 @@ enum State {IDLE, RUN, AIR, DASH, WALL}
 @export var STOMP_BOUNCE: 		float	= -260.0
 @export var MAX_FALL_SPEED: 	float	= 900.0
 @export var MAX_AIR_JUMPS: 		int  	= 1
+const LAND_DUST_IMPACT_SCALE:	float	= 35.0
+const LAND_SHAKE_MIN_IMPACT:	float	= 120.0		#threshold
+const LAND_SHAKE_DIVISOR:		float	= 220.0
+const LAND_ZOOM_DIVISOR:		float	= 1400.0
+
 
 # --- Dashing ---
 @export_group("Dashing")
@@ -32,8 +38,9 @@ enum State {IDLE, RUN, AIR, DASH, WALL}
 @export var dash_direction:		float	= 1.0
 @export var DASH_SPEED:			float	= 600.0
 @export var DASH_DURATION:		float	= 0.2
-const DASH_COOLDOWN:			float	= 0.4	# Time between dashes
 var can_dash:					bool	= true
+const DASH_COOLDOWN:			float	= 0.4	# Time between dashes
+const DASH_EXIT_SPEED_MULT:		float	= 1.1
 
 # --- Wall Movement ---
 @export_group("Wall Movement")
@@ -42,6 +49,7 @@ var can_dash:					bool	= true
 @export var WALL_JUMP_FORCE:	Vector2	= Vector2(420.0, -420.0) # X = push out, Y = upward lift
 const WALL_COYOTE_TIME: 		float	= 0.15
 const WALL_JUMP_LOCK_TIME: 		float	= 0.15
+const WALL_JUMP_STEERING_MULT:	float	= 0.35
 
 var wall_coyote_timer: 			float	= 0.0
 var wall_jump_lock_timer: 		float	= 0.0
@@ -191,7 +199,7 @@ func _update_idle(_delta: float, direction: float) -> void:
 
 func _update_run(delta: float, direction: float) -> void:
 	# Dust Animation
-	if is_on_floor() and abs(velocity.x) > 40.0:
+	if is_on_floor() and abs(velocity.x) > RUN_DUST_THRESHOLD:
 		dust_cooldown -= delta
 		if dust_cooldown <= 0.0:
 			dust_cooldown = 0.2
@@ -233,7 +241,7 @@ func _update_dash(delta: float, direction: float) -> void:
 	# Trigger
 	if dash_timer <= 0.0:
 		# Snip excess speed upon exiting dash so movement remains precise
-		velocity.x = dash_direction * minf(absf(velocity.x), FLOOR_MAX_SPEED * 1.1)
+		velocity.x = dash_direction * minf(absf(velocity.x), FLOOR_MAX_SPEED * DASH_EXIT_SPEED_MULT)
 
 		if direction != 0.0:
 			_switch_state(State.RUN)
@@ -277,6 +285,7 @@ func _apply_gravity(delta):
 		velocity.y += BASE_GRAVITY * mult * delta
 		velocity.y = min(velocity.y, MAX_FALL_SPEED)
 
+
 func _handle_horizontal_movement(delta: float, direction) -> void:
 	#var direction := Input.get_axis("move_left", "move_right")
 	if direction != 0.0:
@@ -285,7 +294,7 @@ func _handle_horizontal_movement(delta: float, direction) -> void:
 		
 		# If locked out from a wall jump, dampen steering weight temporarily
 		if wall_jump_lock_timer > 0.0:
-			accel *= 0.35
+			accel *= WALL_JUMP_STEERING_MULT
 		
 		velocity.x = move_toward(velocity.x, direction * FLOOR_MAX_SPEED, accel * delta)
 	else:
@@ -367,11 +376,11 @@ func _check_landing(fall_speed: float):
 		# Squish the player on impact — harder falls flatten more, but even a soft
 		# hop gets a clear squish. The spring then bounces it back through a stretch.
 		visuals.trigger_land_squash(impact)
-		visuals.spawn_dust(clamp(int(impact / 35.0), 4, 14))
+		visuals.spawn_dust(clamp(int(impact / LAND_DUST_IMPACT_SCALE), 4, 14))
 		
 		# Only real falls shake the screen — a normal hop barely registers.
-		visuals.add_shake(clamp((impact - 120.0) / 220.0, 0.0, 2.0))
-		visuals.add_zoom_punch(clamp(impact / 1400.0, 0.0, 0.05))
+		visuals.add_shake(clamp((impact - LAND_SHAKE_MIN_IMPACT) / LAND_SHAKE_DIVISOR, 0.0, 2.0))
+		visuals.add_zoom_punch(clamp(impact / LAND_ZOOM_DIVISOR, 0.0, 0.05))
 		
 		AudioManager.play_sound("land")
 
