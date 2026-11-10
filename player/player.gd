@@ -113,8 +113,10 @@ func _physics_process(delta: float) -> void:
 func _process_state(delta: float) -> void: 
 	var direction := Input.get_axis("move_left", "move_right")
 	
-	# Global Inputs & Timers Router
-	if _handle_global_inputs(delta):
+	# Global Inputs & Timers Router (Returns a target state if an action triggered)
+	var target_state := _handle_global_inputs(delta)
+	if target_state != active_state:
+		_switch_state(target_state)
 		return # Interrupted this frame (e.g., just started a jump or dash)
 
 	if active_state != State.DASH:
@@ -145,7 +147,7 @@ func _switch_state(new_state: State) -> void:
 	active_state = new_state
 
 #we can improve this mess
-func _handle_global_inputs(delta: float) -> bool:
+func _handle_global_inputs(delta: float) -> State:
 	# Handle timers, jump buffering, and global triggers (Jump/Dash)
 
 	# Unconditional timers & cooldowns (must run every frame)
@@ -165,27 +167,27 @@ func _handle_global_inputs(delta: float) -> bool:
 	else:
 		jump_buffer_timer = max(jump_buffer_timer - delta, 0.0)
 	
-	# Universal Ground Jump (Ignored if currently touching a wall)
-	if active_state != State.AIR and jump_buffer_timer > 0.0 and coyote_timer > 0.0 and not is_on_wall(): #maybe there is room for improvement here
+	# Universal Ground Jump
+	if active_state != State.AIR and jump_buffer_timer > 0.0 and coyote_timer > 0.0 and not is_on_wall(): #maybe room for improvement on this line?
 		_execute_jump(JUMP_HEIGHT)
 		jump_buffer_timer = 0.0
 		coyote_timer = 0.0
-		_switch_state(State.AIR)
-		return true
+		return State.AIR
 
 	# Wall Jump (Triggers from Air or Wall Slide if coyote window is active)
 	if jump_buffer_timer > 0.0 and wall_coyote_timer > 0.0 and active_state != State.DASH:
 		_execute_wall_jump()
 		jump_buffer_timer = 0.0
 		wall_coyote_timer = 0.0
-		return true
+		return State.AIR
 
 	# Dash Input Check
 	if active_state != State.DASH and Input.is_action_just_pressed("dash"):
-		_execute_dash()
-		return true
+		if can_dash:
+			_execute_dash()
+			return State.DASH
 
-	return false
+	return active_state
 
 # ---------------------------------------------------------------------------
 #  State Update Handlers
@@ -337,9 +339,6 @@ func _execute_jump(jump_force: float):
 	visuals.spawn_dust(6)
 
 func _execute_dash() -> void:
-	if not can_dash or dash_cooldown_timer > 0.0:
-		return
-
 	can_dash = false
 	dash_cooldown_timer = DASH_COOLDOWN
 
@@ -349,7 +348,6 @@ func _execute_dash() -> void:
 	AudioManager.play_sound("dash")
 	visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
 	visuals.activate_trail()
-	_switch_state(State.DASH)
 
 func _execute_wall_jump() -> void:
 	# Push away from the wall normal (e.g., if wall is on the left, normal.x is 1, push right)
@@ -363,7 +361,6 @@ func _execute_wall_jump() -> void:
 	AudioManager.play_sound("jump")
 	visuals.trigger_jump_stretch()
 	visuals.spawn_dust(6)
-	_switch_state(State.AIR)
 
 # ---------------------------------------------------------------------------
 #  Game Events, Landings & Hazards
