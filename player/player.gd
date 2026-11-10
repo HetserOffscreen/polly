@@ -1,7 +1,6 @@
 extends CharacterBody2D
 
-enum State {IDLE, RUN, AIR, DASH, WALL_SLIDE}
-var active_state:= State.IDLE
+enum State {IDLE, RUN, AIR, DASH, WALL}
 
 @onready var player_body:		Polygon2D			= %Body
 @onready var player_collision:	CollisionPolygon2D	= %CollisionShape
@@ -19,8 +18,8 @@ var active_state:= State.IDLE
 
 # --- Jumping ---
 @export_group("Jumping")
-@export var JUMP_HEIGHT: 		float	= -450.0	# jump max height
-@export var DOUBLE_JUMP_HEIGHT: float	= -300.0  	# weaker
+@export var JUMP_HEIGHT: 		float	= -450.0	# max height
+@export var DOUBLE_JUMP_HEIGHT: float	= -300.0  	# a bit weaker
 @export var JUMP_CUT: 			float	= 0.45
 @export var STOMP_BOUNCE: 		float	= -260.0
 @export var MAX_FALL_SPEED: 	float	= 900.0
@@ -63,6 +62,7 @@ const JUMP_BUFFER: 				float	= 0.10
 const CORNER_CORRECTION_PIXELS: int	 	= 4			# value in Pixels
 
 # --- Runtime state aand Flags ---
+var active_state: 				State	= State.IDLE
 var air_jumps_left:				int		= 0
 var coyote_timer:				float	= 0.0
 var jump_buffer_timer:			float	= 0.0
@@ -70,12 +70,15 @@ var dust_cooldown:				float	= 0.0
 var was_on_floor:				bool	= false
 var is_dead:					bool	= false
 
+# ---------------------------------------------------------------------------
+#  Main Loop
+# ---------------------------------------------------------------------------
 func _ready() -> void:
-	# use get_tree().get_first_node_in_group("player") to track the player
-	add_to_group("player")
+	add_to_group("player")	# use get_tree().get_first_node_in_group("player") to track the player
 	player_collision.polygon = player_body.polygon
 	player_body.color = Color.WHITE
-	get_tree().debug_collisions_hint = true
+	
+#	get_tree().debug_collisions_hint = true		#for build only
 
 func _physics_process(delta: float) -> void:
 	if is_dead:
@@ -96,20 +99,10 @@ func _physics_process(delta: float) -> void:
 
 	#print(State.find_key(active_state))
 
-func _update_wall_tracking(delta: float) -> void:
-	if wall_jump_lock_timer > 0.0:
-		wall_jump_lock_timer = max(wall_jump_lock_timer - delta, 0.0)
-
-	if not is_on_floor() and is_on_wall():
-		wall_coyote_timer = WALL_COYOTE_TIME
-		current_wall_normal_x = get_wall_normal().x
-	else:
-		wall_coyote_timer = max(wall_coyote_timer - delta, 0.0)
-
 # ---------------------------------------------------------------------------
-#  FINITE STATE MACHINE
+#  FSM Core & Input Routing
 # ---------------------------------------------------------------------------
-func _process_state(delta: float) -> void:
+func _process_state(delta: float) -> void: 
 	var direction := Input.get_axis("move_left", "move_right")
 	
 	# Global Inputs & Timers Router
@@ -125,89 +118,23 @@ func _process_state(delta: float) -> void:
 		State.RUN:	_update_run(delta, direction)
 		State.AIR:	_update_air(delta, direction)
 		State.DASH:	_update_dash(delta, direction)
-		State.WALL_SLIDE: _update_wall_slide(delta, direction)
+		State.WALL: _update_wall(delta, direction)
 
 func _switch_state(new_state: State) -> void:
 	if new_state == active_state:
 		return
 	
-	#  Entry - One Time Operations
+	# Entry - One Time Operations
 	match new_state:
-		State.IDLE:
-			pass
-
-		State.RUN:
-			pass
-
-		State.AIR:
-			pass
-
+		State.IDLE:	pass
+		State.RUN:	pass
+		State.AIR:	pass
 		State.DASH:
-			dash_timer = DASH_DURATION
-
-		State.WALL_SLIDE:
+			dash_timer = DASH_DURATION		
+		State.WALL:
 			wall_hang_timer = WALL_HANG_DURATION
 			visuals.trigger_wall_squash()
-
 	active_state = new_state
-
-func _update_idle(_delta: float, direction: float) -> void:
-	# Trigger
-	if direction != 0.0:
-		_switch_state(State.RUN)
-	elif not is_on_floor():
-		_switch_state(State.AIR)
-
-func _update_run(delta: float, direction: float) -> void:
-	# Dust Animation
-	if is_on_floor() and abs(velocity.x) > 40.0:
-		dust_cooldown -= delta
-		if dust_cooldown <= 0.0:
-			dust_cooldown = 0.2
-			visuals.spawn_dust(3)
-
-	# Trigger
-	if direction == 0.0:
-		_switch_state(State.IDLE)
-	elif not is_on_floor():
-		_switch_state(State.AIR)
-
-func _update_air(_delta: float, direction: float) -> void:
-	# Check for wall slide entry: falling down, touching a wall, pushing towards it
-	if velocity.y > 0.0 and is_on_wall():
-		if direction != 0.0 and sign(direction) == -get_wall_normal().x:
-			_switch_state(State.WALL_SLIDE)
-			return
-
-	# Air jump (Double Jump)
-	if jump_buffer_timer > 0.0 and air_jumps_left > 0:
-		_execute_jump(DOUBLE_JUMP_HEIGHT)
-		visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
-		visuals.activate_trail()
-		air_jumps_left -= 1
-		jump_buffer_timer = 0.0
-	
-	if Input.is_action_just_released("jump") and velocity.y < 0.0:
-		velocity.y *= JUMP_CUT
-
-	# Trigger
-	if is_on_floor():
-		_switch_state(State.IDLE if direction == 0.0 else State.RUN)
-
-func _update_dash(delta: float, direction: float) -> void:
-	velocity.x = dash_direction * DASH_SPEED
-	velocity.y = 0.0
-	dash_timer -= delta
-	
-	# Trigger
-	if dash_timer <= 0.0:
-		# Snip excess speed upon exiting dash so movement remains precise
-		velocity.x = dash_direction * minf(absf(velocity.x), FLOOR_MAX_SPEED * 1.1)
-
-		if direction != 0.0:
-			_switch_state(State.RUN)
-		else:
-			_switch_state(State.IDLE)
 
 #we can improve this mess
 func _handle_global_inputs(delta: float) -> bool:
@@ -252,21 +179,68 @@ func _handle_global_inputs(delta: float) -> bool:
 
 	return false
 
-func _execute_wall_jump() -> void:
-	# Push away from the wall normal (e.g., if wall is on the left, normal.x is 1, push right)
-	var push_dir := current_wall_normal_x
-	velocity.x = push_dir * WALL_JUMP_FORCE.x
-	velocity.y = WALL_JUMP_FORCE.y
-	
-	wall_jump_lock_timer = WALL_JUMP_LOCK_TIME
-	air_jumps_left = MAX_AIR_JUMPS # Refresh double jumps on wall jump!
-	
-	AudioManager.play_sound("jump")
-	visuals.trigger_jump_stretch()
-	visuals.spawn_dust(6)
-	_switch_state(State.AIR)
+# ---------------------------------------------------------------------------
+#  State Update Handlers
+# ---------------------------------------------------------------------------
+func _update_idle(_delta: float, direction: float) -> void:
+	# Trigger
+	if direction != 0.0:
+		_switch_state(State.RUN)
+	elif not is_on_floor():
+		_switch_state(State.AIR)
 
-func _update_wall_slide(delta: float, direction: float) -> void:
+func _update_run(delta: float, direction: float) -> void:
+	# Dust Animation
+	if is_on_floor() and abs(velocity.x) > 40.0:
+		dust_cooldown -= delta
+		if dust_cooldown <= 0.0:
+			dust_cooldown = 0.2
+			visuals.spawn_dust(3)
+
+	# Trigger
+	if direction == 0.0:
+		_switch_state(State.IDLE)
+	elif not is_on_floor():
+		_switch_state(State.AIR)
+
+func _update_air(_delta: float, direction: float) -> void:
+	# Check for wall slide entry: falling down, touching a wall, pushing towards it
+	if velocity.y > 0.0 and is_on_wall():
+		if direction != 0.0 and sign(direction) == -get_wall_normal().x:
+			_switch_state(State.WALL)
+			return
+
+	# Air jump (Double Jump)
+	if jump_buffer_timer > 0.0 and air_jumps_left > 0:
+		_execute_jump(DOUBLE_JUMP_HEIGHT)
+		visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
+		visuals.activate_trail()
+		air_jumps_left -= 1
+		jump_buffer_timer = 0.0
+	
+	if Input.is_action_just_released("jump") and velocity.y < 0.0:
+		velocity.y *= JUMP_CUT
+
+	# Trigger
+	if is_on_floor():
+		_switch_state(State.IDLE if direction == 0.0 else State.RUN)
+
+func _update_dash(delta: float, direction: float) -> void:
+	velocity.x = dash_direction * DASH_SPEED
+	velocity.y = 0.0
+	dash_timer -= delta
+	
+	# Trigger
+	if dash_timer <= 0.0:
+		# Snip excess speed upon exiting dash so movement remains precise
+		velocity.x = dash_direction * minf(absf(velocity.x), FLOOR_MAX_SPEED * 1.1)
+
+		if direction != 0.0:
+			_switch_state(State.RUN)
+		else:
+			_switch_state(State.IDLE)
+
+func _update_wall(delta: float, direction: float) -> void:
 	# Cap fall speed to a slow, smooth slide
 	if wall_hang_timer > 0.0:
 		wall_hang_timer -= delta # Decrements the hang timer
@@ -287,7 +261,7 @@ func _update_wall_slide(delta: float, direction: float) -> void:
 		_switch_state(State.AIR)
 
 # ---------------------------------------------------------------------------
-#  MOVEMENT
+#  Physics & Environmental Checks
 # ---------------------------------------------------------------------------
 func _apply_gravity(delta):
 	if active_state == State.DASH:
@@ -318,26 +292,15 @@ func _handle_horizontal_movement(delta: float, direction) -> void:
 		var fric := FLOOR_FRICTION if is_on_floor() else AIR_FRICTION
 		velocity.x = move_toward(velocity.x, 0.0, fric * delta)
 
-func _execute_jump(jump_force: float):
-	AudioManager.play_sound("jump")
-	velocity.y = jump_force
-	visuals.trigger_jump_stretch()   # stretch tall on take-off
-	visuals.spawn_dust(6)
+func _update_wall_tracking(delta: float) -> void:
+	if wall_jump_lock_timer > 0.0:
+		wall_jump_lock_timer = max(wall_jump_lock_timer - delta, 0.0)
 
-func _execute_dash() -> void:
-	if not can_dash or dash_cooldown_timer > 0.0:
-		return
-
-	can_dash = false
-	dash_cooldown_timer = DASH_COOLDOWN
-
-	if active_state == State.WALL_SLIDE or wall_coyote_timer > 0.0:
-		dash_direction = current_wall_normal_x
-
-	AudioManager.play_sound("dash")
-	visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
-	visuals.activate_trail()
-	_switch_state(State.DASH)
+	if not is_on_floor() and is_on_wall():
+		wall_coyote_timer = WALL_COYOTE_TIME
+		current_wall_normal_x = get_wall_normal().x
+	else:
+		wall_coyote_timer = max(wall_coyote_timer - delta, 0.0)
 
 func _corner_correction():
 	if velocity.y >= 0.0:
@@ -355,30 +318,46 @@ func _corner_correction():
 				global_position.x += dir * offset
 				return
 
-func die():
-	if is_dead:
+# ---------------------------------------------------------------------------
+#  Action Triggers & Execution
+# ---------------------------------------------------------------------------
+func _execute_jump(jump_force: float):
+	AudioManager.play_sound("jump")
+	velocity.y = jump_force
+	visuals.trigger_jump_stretch()   # stretch tall on take-off
+	visuals.spawn_dust(6)
+
+func _execute_dash() -> void:
+	if not can_dash or dash_cooldown_timer > 0.0:
 		return
-	is_dead = true
 
-	#_switch_state(State.HURT)
+	can_dash = false
+	dash_cooldown_timer = DASH_COOLDOWN
 
-	AudioManager.play_sound("hurt")
-	visuals.spawn_burst(global_position + Vector2(0, -6), Color(1.0, 0.4, 0.4), 22, 150.0)
-	visuals.flash_screen(Color(0.7, 0.05, 0.05, 0.55), 0.5)   # red full-screen hit-flash
-	visuals.add_shake(7.0)
-	visuals.add_zoom_punch(0.18)
-	velocity = Vector2.ZERO
-	set_physics_process(false)
-	player_collision.set_deferred("disabled", true)
+	if active_state == State.WALL or wall_coyote_timer > 0.0:
+		dash_direction = current_wall_normal_x
 
-	# Dramatic slow-mo, then restart.
-	Engine.time_scale = 0.4
-	await get_tree().create_timer(0.8, true, false, true).timeout
-	Engine.time_scale = 1.0
-	get_tree().reload_current_scene()
+	AudioManager.play_sound("dash")
+	visuals.spawn_burst(global_position + Vector2(0, -6), Color(0.9, 0.95, 1.0), 8, 70.0)
+	visuals.activate_trail()
+	_switch_state(State.DASH)
+
+func _execute_wall_jump() -> void:
+	# Push away from the wall normal (e.g., if wall is on the left, normal.x is 1, push right)
+	var push_dir := current_wall_normal_x
+	velocity.x = push_dir * WALL_JUMP_FORCE.x
+	velocity.y = WALL_JUMP_FORCE.y
+	
+	wall_jump_lock_timer = WALL_JUMP_LOCK_TIME
+	air_jumps_left = MAX_AIR_JUMPS # Refresh double jumps on wall jump!
+	
+	AudioManager.play_sound("jump")
+	visuals.trigger_jump_stretch()
+	visuals.spawn_dust(6)
+	_switch_state(State.AIR)
 
 # ---------------------------------------------------------------------------
-#  LANDING & STOMPING
+#  Game Events, Landings & Hazards
 # ---------------------------------------------------------------------------
 func _check_landing(fall_speed: float):
 	# Just touched down this frame.
@@ -408,3 +387,25 @@ func bounce(amount: float = STOMP_BOUNCE):
 	visuals.activate_trail()             # streak off the bounce
 	visuals.trigger_bounce_squash()
 	visuals.hit_stop(0.07)
+
+func die():
+	if is_dead:
+		return
+	is_dead = true
+
+	#_switch_state(State.HURT)
+
+	AudioManager.play_sound("hurt")
+	visuals.spawn_burst(global_position + Vector2(0, -6), Color(1.0, 0.4, 0.4), 22, 150.0)
+	visuals.flash_screen(Color(0.7, 0.05, 0.05, 0.55), 0.5)   # red full-screen hit-flash
+	visuals.add_shake(7.0)
+	visuals.add_zoom_punch(0.18)
+	velocity = Vector2.ZERO
+	set_physics_process(false)
+	player_collision.set_deferred("disabled", true)
+
+	# Dramatic slow-mo, then restart.
+	Engine.time_scale = 0.4
+	await get_tree().create_timer(0.8, true, false, true).timeout
+	Engine.time_scale = 1.0
+	get_tree().reload_current_scene()
