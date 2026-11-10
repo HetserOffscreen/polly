@@ -266,7 +266,7 @@ func _update_wall(delta: float, direction: float) -> void:
 		_switch_state(State.IDLE if direction == 0.0 else State.RUN)
 	elif not is_on_wall():
 		_switch_state(State.AIR)
-	elif direction != 0.0 and sign(direction) != current_wall_normal_x:
+	elif direction != 0.0 and sign(direction) == current_wall_normal_x:
 		# Pushing away from the wall releases the slide
 		_switch_state(State.AIR)
 
