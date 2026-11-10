@@ -44,7 +44,7 @@ const DASH_EXIT_SPEED_MULT:		float	= 1.1
 
 # --- Wall Movement ---
 @export_group("Wall Movement")
-@export var WALL_SLIDE_SPEED: 	float	= 120.0 # FIX -not working properly
+@export var WALL_SLIDE_SPEED: 	float	= 220.0 # FIX -not working properly
 @export var WALL_HANG_DURATION: float	= 0.12     # Hold momentarily before sliding
 @export var WALL_JUMP_FORCE:	Vector2	= Vector2(420.0, -420.0) # X = push out, Y = upward lift
 const WALL_COYOTE_TIME: 		float	= 0.15
@@ -143,6 +143,8 @@ func _switch_state(new_state: State) -> void:
 			dash_timer = DASH_DURATION		
 		State.WALL:
 			wall_hang_timer = WALL_HANG_DURATION
+			can_dash = true
+			air_jumps_left = MAX_AIR_JUMPS
 			visuals.trigger_wall_squash()
 	active_state = new_state
 
@@ -155,7 +157,7 @@ func _handle_global_inputs(delta: float) -> State:
 		dash_cooldown_timer = max(dash_cooldown_timer - delta, 0.0)
 
 	# Update timers globally for ground states
-	if is_on_floor() or is_on_wall():
+	if is_on_floor():
 		coyote_timer = COYOTE_TIME
 		air_jumps_left = MAX_AIR_JUMPS
 		can_dash = true
@@ -166,19 +168,19 @@ func _handle_global_inputs(delta: float) -> State:
 		jump_buffer_timer = JUMP_BUFFER
 	else:
 		jump_buffer_timer = max(jump_buffer_timer - delta, 0.0)
-	
-	# Universal Ground Jump
-	if active_state != State.AIR and jump_buffer_timer > 0.0 and coyote_timer > 0.0 and not is_on_wall(): #maybe room for improvement on this line?
-		_execute_jump(JUMP_HEIGHT)
-		jump_buffer_timer = 0.0
-		coyote_timer = 0.0
-		return State.AIR
 
 	# Wall Jump (Triggers from Air or Wall Slide if coyote window is active)
 	if jump_buffer_timer > 0.0 and wall_coyote_timer > 0.0 and active_state != State.DASH:
 		_execute_wall_jump()
 		jump_buffer_timer = 0.0
 		wall_coyote_timer = 0.0
+		return State.AIR
+	
+	# Universal Ground Jump
+	if active_state != State.AIR and jump_buffer_timer > 0.0 and coyote_timer > 0.0 and not is_on_wall(): #maybe room for improvement on this line?
+		_execute_jump(JUMP_HEIGHT)
+		jump_buffer_timer = 0.0
+		coyote_timer = 0.0
 		return State.AIR
 
 	# Dash Input Check
