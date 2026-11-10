@@ -8,16 +8,15 @@ enum State {IDLE, RUN, AIR, DASH, WALL}
 @onready var camera: 			Camera2D           	= %Camera2D
 @onready var visuals:			Node2D				= %Visuals
 
-# --- Horizontal movement ---
 @export_group("Horizontal Movement")
 @export var FLOOR_MAX_SPEED: 	float	= 500.0
 @export var FLOOR_ACCELERATION:	float	= 1300.0
-@export var FLOOR_FRICTION:		float	= 1800.0
+@export var FLOOR_FRICTION:		float	= 3000.0
 @export var AIR_ACCELERATION:	float	= 900.0		# weaker steering in the air...
 @export var AIR_FRICTION:		float	= 300.0   	# longer momentum
 const RUN_DUST_THRESHOLD:		float	= 40.0
+const TURN_ACCELERATION:		float	= 2.5
 
-# --- Jumping ---
 @export_group("Jumping")
 @export var JUMP_HEIGHT: 		float	= -450.0	# max height
 @export var DOUBLE_JUMP_HEIGHT: float	= -300.0  	# a bit weaker
@@ -30,22 +29,19 @@ const LAND_SHAKE_MIN_IMPACT:	float	= 120.0		#threshold
 const LAND_SHAKE_DIVISOR:		float	= 220.0
 const LAND_ZOOM_DIVISOR:		float	= 1400.0
 
-
-# --- Dashing ---
 @export_group("Dashing")
 @export var dash_timer:			float	= 0.0
 @export var dash_cooldown_timer:float	= 0.0
 @export var dash_direction:		float	= 1.0
-@export var DASH_SPEED:			float	= 600.0
-@export var DASH_DURATION:		float	= 0.2
+@export var DASH_SPEED:			float	= 750.0
+@export var DASH_DURATION:		float	= 0.12
 var can_dash:					bool	= true
-const DASH_COOLDOWN:			float	= 0.4	# Time between dashes
+const DASH_COOLDOWN:			float	= 0.		# Time between dashes
 const DASH_EXIT_SPEED_MULT:		float	= 1.1
 
-# --- Wall Movement ---
 @export_group("Wall Movement")
-@export var WALL_SLIDE_SPEED: 	float	= 220.0 # FIX -not working properly
-@export var WALL_HANG_DURATION: float	= 0.12     # Hold momentarily before sliding
+@export var WALL_SLIDE_SPEED: 	float	= 350.0
+@export var WALL_HANG_DURATION: float	= 0.02		# Hold momentarily 
 @export var WALL_JUMP_FORCE:	Vector2	= Vector2(420.0, -420.0) # X = push out, Y = upward lift
 const WALL_COYOTE_TIME: 		float	= 0.15
 const WALL_JUMP_LOCK_TIME: 		float	= 0.15
@@ -56,21 +52,20 @@ var wall_jump_lock_timer: 		float	= 0.0
 var wall_hang_timer:			float	= 0.0
 var current_wall_normal_x:		float	= 0.0
 
-# --- Gravity feel ---
-@export_group("Gravity feel")
-const RISE_GRAVITY_MULT: 		float	= 0.9		# a little floaty on the way up
-const FALL_GRAVITY_MULT:		float	= 3.0		# snappier on the way down
-const APEX_SPEED_THRESHOLD:		float	= 45.0		# |vertical speed| under this = "near the apex"
-const APEX_GRAVITY_MULT: 		float	= 0.55		# extra-light gravity inside the hang window
-const BASE_GRAVITY:				float	= 980.0		# value in px/s²
+@export_group("Gravity Feel")
+@export var RISE_GRAVITY_MULT: 		float	= 0.9		# a little floaty on the way up
+@export var FALL_GRAVITY_MULT:		float	= 3.0		# snappier on the way down
+@export var APEX_SPEED_THRESHOLD:	float	= 45.0		# |vertical speed| under this = "near the apex"
+@export var APEX_GRAVITY_MULT: 		float	= 0.55		# extra-light gravity inside the hang window
+@export var BASE_GRAVITY:			float	= 980.0		# value in px/s²
 
-# --- Forgiveness windows (seconds) ---
-const COYOTE_TIME: 				float	= 0.10		
-const JUMP_BUFFER: 				float	= 0.10		
+@export_group("Forgiveness Windows")
+const COYOTE_TIME: 				float	= 0.10		# value in seconds
+const JUMP_BUFFER: 				float	= 0.10		# value in seconds
 const CORNER_CORRECTION_PIXELS: int	 	= 4			# value in Pixels
 
-# --- Runtime state aand Flags ---
-var active_state: 				State	= State.IDLE
+@export_group("Runtime state and Flags")
+var active_state:		State	= State.IDLE
 var air_jumps_left:				int		= 0
 var coyote_timer:				float	= 0.0
 var jump_buffer_timer:			float	= 0.0
@@ -275,7 +270,7 @@ func _update_wall(delta: float, direction: float) -> void:
 # ---------------------------------------------------------------------------
 #  Physics & Environmental Checks
 # ---------------------------------------------------------------------------
-func _apply_gravity(delta):
+func _apply_gravity(delta) -> void:
 	if active_state == State.DASH:
 		return # <--- Dashes stay perfectly crisp without gravity interference
 		
@@ -296,6 +291,11 @@ func _handle_horizontal_movement(delta: float, direction) -> void:
 		dash_direction = direction # Continuously remember the last direction moved/faced
 		var accel := FLOOR_ACCELERATION if is_on_floor() else AIR_ACCELERATION
 		
+		# If trying to move in the opposite direction of current momentum, snap it faster:
+		if sign(direction) != sign(velocity.x):
+			accel *= TURN_ACCELERATION
+
+
 		# If locked out from a wall jump, dampen steering weight temporarily
 		if wall_jump_lock_timer > 0.0:
 			accel *= WALL_JUMP_STEERING_MULT
@@ -315,7 +315,7 @@ func _update_wall_tracking(delta: float) -> void:
 	else:
 		wall_coyote_timer = max(wall_coyote_timer - delta, 0.0)
 
-func _corner_correction():
+func _corner_correction() -> void:
 	if velocity.y >= 0.0:
 		return
 	var motion := Vector2(0.0, velocity.y) * get_physics_process_delta_time()
@@ -334,7 +334,7 @@ func _corner_correction():
 # ---------------------------------------------------------------------------
 #  Action Triggers & Execution
 # ---------------------------------------------------------------------------
-func _execute_jump(jump_force: float):
+func _execute_jump(jump_force: float) -> void:
 	AudioManager.play_sound("jump")
 	velocity.y = jump_force
 	visuals.trigger_jump_stretch()   # stretch tall on take-off
@@ -367,7 +367,7 @@ func _execute_wall_jump() -> void:
 # ---------------------------------------------------------------------------
 #  Game Events, Landings & Hazards
 # ---------------------------------------------------------------------------
-func _check_landing(fall_speed: float):
+func _check_landing(fall_speed: float) -> void:
 	# Just touched down this frame.
 	if is_on_floor() and not was_on_floor:
 		var impact = max(fall_speed, 0.0)  # downward speed at the moment of impact
@@ -386,7 +386,7 @@ func _check_landing(fall_speed: float):
 # Called by an enemy when we land on its head:
 # pop upward, refresh the air jump, and pile on the feedback (a freeze-frame, a shake, a squash) to sell the hit.
 # Enemies are Area2D-based, so they detect the stomp and call this on us.
-func bounce(amount: float = STOMP_BOUNCE):
+func bounce(amount: float = STOMP_BOUNCE) -> void:
 	velocity.y = amount
 	air_jumps_left = MAX_AIR_JUMPS
 	AudioManager.play_sound("stomp")
@@ -396,7 +396,7 @@ func bounce(amount: float = STOMP_BOUNCE):
 	visuals.trigger_bounce_squash()
 	visuals.hit_stop(0.07)
 
-func die():
+func die() -> void:
 	if is_dead:
 		return
 	is_dead = true
